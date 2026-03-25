@@ -1,0 +1,3109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>26년 직책자 평가 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<style>
+:root {
+  --primary:#1a3a5c; --primary-light:#2c5f8a; --accent:#e8b84b; --accent-light:#f5d78e;
+  --success:#2e7d32; --success-light:#e8f5e9; --danger:#c62828; --danger-light:#ffebee;
+  --warning:#f57f17; --warning-light:#fff8e1; --bg:#f4f6f9; --surface:#fff;
+  --border:#dde2ea; --text:#1a2332; --text-muted:#6b7a8d; --sidebar-w:230px; --header-h:56px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+
+/* ══ LOGIN ══ */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1a3a5c 0%,#2c5f8a 60%,#1a3a5c 100%);}
+.login-box{background:#fff;border-radius:16px;padding:40px 36px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.login-logo{text-align:center;margin-bottom:28px;}
+.login-logo .year{font-size:11px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;}
+.login-logo .title{font-size:20px;font-weight:800;color:var(--primary);margin-top:4px;}
+.login-logo .sub{font-size:12px;color:var(--text-muted);margin-top:3px;}
+.login-form .field{margin-bottom:14px;}
+.login-form label{display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;}
+.login-form input{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);transition:border-color .15s;font-family:inherit;}
+.login-form input:focus{outline:none;border-color:var(--primary);}
+.login-btn{width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:background .15s;font-family:inherit;}
+.login-btn:hover{background:var(--primary-light);}
+.login-err{color:var(--danger);font-size:12px;text-align:center;margin-top:10px;min-height:18px;}
+
+/* ══ APP ══ */
+#app-screen{display:none;}
+.layout{display:flex;min-height:100vh;}
+.sidebar{width:var(--sidebar-w);background:var(--primary);position:fixed;top:0;left:0;height:100vh;display:flex;flex-direction:column;z-index:100;}
+.sidebar-logo{padding:16px;border-bottom:1px solid rgba(255,255,255,.1);}
+.sidebar-logo .year{font-size:10px;color:rgba(255,255,255,.5);letter-spacing:1px;}
+.sidebar-logo .title{font-size:14px;font-weight:700;color:#fff;margin-top:2px;}
+.sidebar-logo .sub{font-size:11px;color:var(--accent-light);margin-top:1px;}
+.nav{flex:1;padding:8px 0;overflow-y:auto;}
+.nav-section{padding:10px 16px 4px;font-size:10px;color:rgba(255,255,255,.35);letter-spacing:1px;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:rgba(255,255,255,.7);font-size:13px;transition:all .15s;border-left:3px solid transparent;}
+.nav-item:hover{background:rgba(255,255,255,.05);color:#fff;}
+.nav-item.active{background:rgba(255,255,255,.1);color:#fff;border-left-color:var(--accent);}
+.nav-icon{font-size:15px;width:20px;text-align:center;}
+.sidebar-bottom{padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);}
+.user-badge{background:rgba(232,184,75,.15);border:1px solid rgba(232,184,75,.3);border-radius:8px;padding:10px 12px;}
+.user-badge .role-tag{font-size:10px;color:var(--accent-light);display:flex;align-items:center;gap:4px;}
+.user-badge .uname{font-size:13px;color:#fff;font-weight:700;margin-top:2px;}
+.user-badge .uid{font-size:10px;color:rgba(255,255,255,.5);margin-top:1px;}
+.logout-btn{width:100%;margin-top:8px;padding:7px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;}
+.logout-btn:hover{background:rgba(255,255,255,.15);color:#fff;}
+
+.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+.topbar{height:var(--header-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;position:sticky;top:0;z-index:50;}
+.topbar-title{font-size:15px;font-weight:700;color:var(--primary);}
+.topbar-sub{font-size:12px;color:var(--text-muted);}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;}
+.badge-blue{background:#e3eef8;color:#1a3a5c;}
+.badge-green{background:var(--success-light);color:var(--success);}
+.badge-orange{background:var(--warning-light);color:var(--warning);}
+.badge-red{background:var(--danger-light);color:var(--danger);}
+.badge-gold{background:#fff8e1;color:#b7791f;}
+.badge-purple{background:#f3e8ff;color:#6b21a8;}
+.content{flex:1;padding:24px;}
+.page{display:none;}.page.active{display:block;}
+
+/* ══ CARDS ══ */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.card-title{font-size:14px;font-weight:700;color:var(--primary);}
+.card-body{padding:18px;}
+
+/* ══ STATS ══ */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}
+.stat-label{font-size:11px;color:var(--text-muted);margin-bottom:6px;}
+.stat-val{font-size:26px;font-weight:700;color:var(--primary);line-height:1;}
+.stat-sub{font-size:11px;color:var(--text-muted);margin-top:4px;}
+.progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:6px;}
+.progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .3s;}
+
+/* ══ TABLE ══ */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:#f0f3f8;color:var(--primary);font-weight:700;padding:9px 10px;text-align:center;border:1px solid var(--border);white-space:nowrap;font-size:11px;}
+td{padding:7px 10px;border:1px solid var(--border);text-align:center;vertical-align:middle;}
+tr:hover td{background:#f8f9fc;}
+.td-left{text-align:left;}
+.grade-S{color:#c62828;font-weight:700;} .grade-A{color:#1565c0;font-weight:700;}
+.grade-B{color:#2e7d32;font-weight:700;} .grade-C{color:#e65100;font-weight:700;}
+.grade-D,.grade-E{color:#6b7a8d;font-weight:700;}
+.incentive-y{color:var(--danger);font-weight:600;} .incentive-n{color:var(--text-muted);}
+
+/* ══ EVAL ══ */
+select.grade-sel{border:1px solid var(--border);border-radius:4px;padding:4px 5px;font-size:12px;font-weight:600;color:var(--primary);background:var(--surface);width:80px;}
+.score-display{font-size:14px;font-weight:700;color:var(--primary);}
+textarea.comment{width:100%;border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:11px;resize:vertical;min-height:52px;font-family:inherit;color:var(--text);}
+textarea.comment:focus{outline:none;border-color:var(--primary-light);}
+.grade-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.grade-pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:var(--surface);}
+.grade-dot{width:8px;height:8px;border-radius:50%;}
+
+/* ══ BUTTONS ══ */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:inherit;}
+.btn-primary{background:var(--primary);color:#fff;} .btn-primary:hover{background:var(--primary-light);}
+.btn-accent{background:var(--accent);color:var(--primary);} .btn-accent:hover{background:#d4a83a;}
+.btn-success{background:var(--success);color:#fff;}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);} .btn-outline:hover{background:var(--bg);}
+.btn-sm{padding:5px 11px;font-size:11px;}
+
+/* ══ ALERTS ══ */
+.alert{padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:12px;}
+.alert-info{background:#e3eef8;color:#1a3a5c;border-left:3px solid #2c5f8a;}
+.alert-warning{background:var(--warning-light);color:var(--warning);border-left:3px solid var(--warning);}
+.alert-success{background:var(--success-light);color:var(--success);border-left:3px solid var(--success);}
+
+/* ══ MODAL ══ */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:var(--surface);border-radius:12px;padding:24px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+.modal-title{font-size:16px;font-weight:700;color:var(--primary);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.form-row{margin-bottom:12px;}
+.form-label{font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px;display:block;text-transform:uppercase;letter-spacing:.4px;}
+.form-input{width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);font-family:inherit;transition:border-color .15s;}
+.form-input:focus{outline:none;border-color:var(--primary);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:14px;border-top:1px solid var(--border);}
+
+/* ══ SECTION ══ */
+.section-title{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+.section-title::before{content:'';display:inline-block;width:3px;height:14px;background:var(--accent);border-radius:2px;}
+.complete-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+.chip-done{background:#e8f5e9;color:#2e7d32;} .chip-pending{background:#fff3e0;color:#e65100;}
+.divider{height:1px;background:var(--border);margin:20px 0;}
+
+/* ══ ACCOUNT TABLE ══ */
+.role-admin{background:#fef9e7;color:#b7791f;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+.role-eval{background:#e8f4fd;color:#1565c0;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+.role-person{background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+
+/* ══ TOAST ══ */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--primary);color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;z-index:999;transform:translateY(100px);opacity:0;transition:all .3s;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+/* ══ UPLOAD ══ */
+.upload-zone{border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);margin-bottom:16px;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--primary-light);background:#eef4fb;}
+.upload-zone .upload-icon{font-size:32px;margin-bottom:8px;}
+.upload-zone .upload-text{font-size:13px;color:var(--text-muted);}
+.upload-zone .upload-text strong{color:var(--primary);}
+.upload-result{padding:12px 16px;border-radius:8px;font-size:12px;margin-bottom:12px;display:none;}
+.upload-ok{background:#e8f5e9;color:#2e7d32;border-left:3px solid #2e7d32;}
+.upload-warn{background:#fff8e1;color:#b7791f;border-left:3px solid #e8b84b;}
+@media(max-width:900px){.stats-grid{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="year">2026 · Evaluation System</div>
+      <div class="title">직책자 평가 시스템</div>
+    </div>
+    <div class="login-form">
+      <div class="field">
+        <label>사번</label>
+        <input type="text" id="login-id" placeholder="사번을 입력하세요" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="field">
+        <label>비밀번호</label>
+        <input type="password" id="login-pw" placeholder="비밀번호를 입력하세요" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="login-btn" onclick="doLogin()">로그인</button>
+      <div class="login-err" id="login-err"></div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);text-align:center">
+        <button onclick="resetAllData()" style="background:none;border:none;font-size:11px;color:var(--text-muted);cursor:pointer;text-decoration:underline;font-family:inherit">
+          ⚠️ 로그인이 안 될 경우 여기를 클릭하세요 (초기화)
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ APP ══════════════ -->
+<div id="app-screen">
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="year">2026</div>
+      <div class="title">직책자 평가 시스템</div>
+      <div class="sub" id="app-sidebar-sub">이투스기술학원</div>
+    </div>
+    <nav class="nav" id="sidebar-nav"></nav>
+    <div class="sidebar-bottom">
+      <div class="user-badge">
+        <div class="role-tag" id="sb-role-tag">👤 평가자</div>
+        <div class="uname" id="sb-uname">-</div>
+        <div class="uid" id="sb-uid">사번: -</div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">🚪 로그아웃</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="topbar-title" id="topbar-title">직책자 현황</div>
+        <div class="topbar-sub" id="topbar-sub">직책자 평가 시스템</div>
+      </div>
+      <div class="topbar-right">
+        <span class="badge badge-blue">기준일: 26.01.31</span>
+        <span class="badge badge-green" id="done-badge" style="display:none">완료: 0명</span>
+        <span class="badge badge-orange" id="pending-badge" style="display:none">미완료: -</span>
+        <span class="badge badge-gold" id="cur-user-badge">-</span>
+      </div>
+    </header>
+    <div class="content" id="main-content"></div>
+  </main>
+</div>
+</div>
+
+<!-- ══ MODAL: 직책자 추가/수정 ══ -->
+<div class="modal-overlay" id="modal-person">
+  <div class="modal" style="width:680px">
+    <div class="modal-title" id="modal-person-title">직책자 추가</div>
+    <div class="form-grid">
+      <div class="form-row"><label class="form-label">사원명 *</label><input class="form-input" id="fp-name" placeholder="홍길동"></div>
+      <div class="form-row"><label class="form-label">사번</label><input class="form-input" id="fp-sabun" placeholder="EMP001"></div>
+      <div class="form-row"><label class="form-label">회사명</label><input class="form-input" id="fp-company" placeholder="이투스기술학원"></div>
+      <div class="form-row"><label class="form-label">본부</label><input class="form-input" id="fp-bonbu" placeholder="O2O플랫폼사업본부"></div>
+      <div class="form-row"><label class="form-label">지점</label><input class="form-input" id="fp-jijum" placeholder="이투스기술학원"></div>
+      <div class="form-row"><label class="form-label">실/센터</label><input class="form-input" id="fp-sil" placeholder="전략실"></div>
+      <div class="form-row"><label class="form-label">팀</label><input class="form-input" id="fp-team" placeholder="전략담임팀"></div>
+      <div class="form-row"><label class="form-label">직책</label><input class="form-input" id="fp-jikchek" placeholder="팀장"></div>
+      <div class="form-row"><label class="form-label">직책급</label><input class="form-input" id="fp-jikchekgup" placeholder="1급"></div>
+      <div class="form-row"><label class="form-label">직급</label><input class="form-input" id="fp-jikgup" placeholder="부장"></div>
+      <div class="form-row"><label class="form-label">회사메일</label><input class="form-input" id="fp-email" placeholder="hong@company.com"></div>
+      <div class="form-row"><label class="form-label">직책년차</label><input class="form-input" id="fp-nyeoncha" placeholder="2년차 1분기"></div>
+    </div>
+    <div class="form-row"><label class="form-label">비고</label><input class="form-input" id="fp-bigo" placeholder="특이사항"></div>
+    <div class="form-row">
+      <label class="form-label">평가자 (담당 부서장) *</label>
+      <select class="form-input" id="fp-evaluator">
+        <option value="">-- 평가자 선택 --</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closePModal()">취소</button>
+      <button class="btn btn-primary" onclick="savePerson()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: 계정 추가/수정 ══ -->
+<div class="modal-overlay" id="modal-account">
+  <div class="modal" style="width:480px">
+    <div class="modal-title" id="modal-account-title">계정 추가</div>
+    <div class="form-grid">
+      <div class="form-row"><label class="form-label">사번 *</label><input class="form-input" id="fa-id" placeholder="예: EMP001"></div>
+      <div class="form-row"><label class="form-label">비밀번호 *</label><input class="form-input" id="fa-pw" type="password" placeholder="비밀번호 설정"></div>
+      <div class="form-row"><label class="form-label">이름 *</label><input class="form-input" id="fa-name" placeholder="홍길동"></div>
+      <div class="form-row">
+        <label class="form-label">권한</label>
+        <select class="form-input" id="fa-role">
+          <option value="eval">평가자 (부서장)</option>
+          <option value="admin">관리자</option>
+          <option value="person">피평가자 (직책자)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row"><label class="form-label">소속</label><input class="form-input" id="fa-dept" placeholder="예: 이투스기술"></div>
+    <div class="form-row"><label class="form-label">직책</label><input class="form-input" id="fa-position" placeholder="예: 본부장"></div>
+    <div class="form-row" id="fa-hrview-row" style="display:none">
+      <label class="form-label">인적사항 조회 권한</label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0">
+        <input type="checkbox" id="fa-hrview" style="width:16px;height:16px;cursor:pointer">
+        <span style="font-size:13px">인적사항 목록 및 개인 상세 카드 조회 허용</span>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeAModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveAccount()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════
+//  DEFAULT DATA
+// ══════════════════════════════════════
+const DEFAULT_ACCOUNTS = [
+  {id:'admin', pw:'admin1234', name:'관리자', role:'admin', dept:'HR 관리팀', position:'', hrView:true},
+  {id:'EMP001', pw:'pass1234', name:'곽용호', role:'eval', dept:'이투스기술', position:'본부장', hrView:true},
+];
+
+const DEFAULT_PERSONS = [
+  {no:1,name:'윤진우',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'전략실',team:'전략담임팀',jikchek:'부원장',jikchekgup:'',jikgup:'부장',email:'',nyeoncha:'2년차 1분기',bigo:'',evaluatorId:'EMP001'},
+  {no:2,name:'문인흥',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'전략실',team:'전략담임팀',jikchek:'팀장',jikchekgup:'',jikgup:'부장',email:'',nyeoncha:'3년차 1분기',bigo:'26.01.01 직책 해임 (25.11.01~25.12.31)',evaluatorId:'EMP001'},
+  {no:3,name:'장준호',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'전략실',team:'전략담임팀',jikchek:'팀장',jikchekgup:'',jikgup:'차장',email:'',nyeoncha:'2년차 1분기',bigo:'',evaluatorId:'EMP001'},
+  {no:4,name:'이영세',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'전략실',team:'학생지도2팀',jikchek:'팀장',jikchekgup:'',jikgup:'차장',email:'',nyeoncha:'4년차 1분기',bigo:'',evaluatorId:'EMP001'},
+  {no:5,name:'차원준',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'전략실',team:'학생지도3팀',jikchek:'팀장',jikchekgup:'',jikgup:'과장',email:'',nyeoncha:'3년차 1분기',bigo:'',evaluatorId:'EMP001'},
+  {no:6,name:'이친구',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'행정실',team:'',jikchek:'실장',jikchekgup:'',jikgup:'부장',email:'',nyeoncha:'3년차 1분기',bigo:'',evaluatorId:'EMP001'},
+  {no:7,name:'이강산',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'행정실',team:'교무팀',jikchek:'팀장',jikchekgup:'',jikgup:'차장',email:'',nyeoncha:'3년차 1분기',bigo:'',evaluatorId:'EMP001'},
+  {no:8,name:'차승현',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'행정실',team:'상담팀',jikchek:'팀장',jikchekgup:'',jikgup:'과장',email:'',nyeoncha:'2년차 1분기',bigo:'',evaluatorId:'EMP001'},
+  {no:9,name:'이정혁',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'행정실',team:'학생지도1팀',jikchek:'팀장',jikchekgup:'',jikgup:'과장',email:'',nyeoncha:'1년차 1분기',bigo:'',evaluatorId:'EMP001'},
+];
+
+const GRADE_SCORES = {S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+const GRADES = ['S','A1','A2','B','C','D','E'];
+const GRADE_LABEL = {S:'S (매우우수)',A1:'A(96·우수)',A2:'A(90·우수)',B:'B (양호)',C:'C (보통)',D:'D (미흡)',E:'E (매우미흡)'};
+
+// ══ STATE ══
+let currentUser = null;
+let accounts = [], persons = [], evalData = {};
+let editingPersonNo = null, editingAccountId = null;
+// 인사현황 데이터
+let hrPersons = [];   // 인적사항 목록 (엑셀)
+// 개인별 PDF: { key: { mbo2024, mbo2025, mbo2026, edu, attend, history } }
+let hrPdfs = {};
+// 개인별 추가정보: { key: { photo, edu:[...], attend:{...}, history:[...] } }
+let hrExtra = {};
+
+// ══ FIREBASE 초기화 ══
+const firebaseConfig = {
+  apiKey: "AIzaSyDDDaq48ee9Jmdp8WYd8Ox6iid2tNv1mXQ",
+  authDomain: "reader-test-e5802.firebaseapp.com",
+  projectId: "reader-test-e5802",
+  storageBucket: "reader-test-e5802.firebasestorage.app",
+  messagingSenderId: "457260957136",
+  appId: "1:457260957136:web:0e9c53e63f6c3105a34dd5"
+};
+firebase.initializeApp(firebaseConfig);
+const db      = firebase.firestore();
+const storage = firebase.storage();
+
+// ══ 현재 활성 분기 (관리자가 설정) ══
+let activeQuarter = {year:2026, quarter:1}; // 기본값
+function getQuarterKey(y, q) { return `eval_${y}_Q${q}`; }
+function getActiveKey() { return getQuarterKey(activeQuarter.year, activeQuarter.quarter); }
+
+// ══ STORAGE (Firebase + 로컬 캐시) ══
+async function load() {
+  showLoadingOverlay(true);
+  try {
+    // 계정
+    const accDoc = await db.collection('system').doc('accounts').get();
+    accounts = accDoc.exists ? accDoc.data().list : DEFAULT_ACCOUNTS;
+
+    // 직책자
+    const perDoc = await db.collection('system').doc('persons').get();
+    persons = perDoc.exists ? perDoc.data().list : DEFAULT_PERSONS;
+
+    // 활성 분기 설정
+    const cfgDoc = await db.collection('system').doc('config').get();
+    if (cfgDoc.exists && cfgDoc.data().activeQuarter) {
+      activeQuarter = cfgDoc.data().activeQuarter;
+    }
+
+    // 평가 데이터 (활성 분기)
+    const evalDoc = await db.collection('evalData').doc(getActiveKey()).get();
+    evalData = evalDoc.exists ? evalDoc.data().data : {};
+
+    // 인적사항
+    const hrDoc = await db.collection('hr').doc('persons').get();
+    hrPersons = hrDoc.exists ? hrDoc.data().list : [];
+
+    // PDF URL 맵 (Firestore에서 로드)
+    const hrPdfsSnap = await db.collection('hrPdfs').get();
+    hrPdfs = {};
+    hrPdfsSnap.forEach(doc => { hrPdfs[doc.id] = doc.data(); });
+
+    // 교육/근태/발령 등 추가 데이터 (Firestore에서 로드)
+    const hrExtraSnap = await db.collection('hrExtra').get();
+    hrExtra = {};
+    hrExtraSnap.forEach(doc => { hrExtra[doc.id] = doc.data(); });
+
+    // 로컬 캐시 업데이트
+    localStorage.setItem('acc26',      JSON.stringify(accounts));
+    localStorage.setItem('per26',      JSON.stringify(persons));
+    localStorage.setItem('hr_persons', JSON.stringify(hrPersons));
+    localStorage.setItem('hr_pdfs',    JSON.stringify(hrPdfs));
+    localStorage.setItem('hr_extra',   JSON.stringify(hrExtra));
+    localStorage.setItem(getActiveKey(), JSON.stringify(evalData));
+
+  } catch(err) {
+    console.warn('Firebase 로드 실패, 로컬 캐시 사용:', err);
+    // 오프라인 폴백
+    accounts  = JSON.parse(localStorage.getItem('acc26')    || 'null') || DEFAULT_ACCOUNTS;
+    persons   = JSON.parse(localStorage.getItem('per26')    || 'null') || DEFAULT_PERSONS;
+    evalData  = JSON.parse(localStorage.getItem(getActiveKey()) || localStorage.getItem('eval26q1') || '{}');
+    hrPersons = JSON.parse(localStorage.getItem('hr_persons') || '[]');
+    hrPdfs    = JSON.parse(localStorage.getItem('hr_pdfs')    || '{}');
+    hrExtra   = JSON.parse(localStorage.getItem('hr_extra')   || '{}');
+    persons.forEach(p => {
+      if (!evalData[p.no]) evalData[p.no] = {g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
+    });
+  }
+  showLoadingOverlay(false);
+}
+
+async function save() {
+  // 로컬 캐시 즉시 저장
+  localStorage.setItem('acc26',      JSON.stringify(accounts));
+  localStorage.setItem('per26',      JSON.stringify(persons));
+  localStorage.setItem(getActiveKey(), JSON.stringify(evalData));
+  localStorage.setItem('hr_persons', JSON.stringify(hrPersons));
+  localStorage.setItem('hr_pdfs',    JSON.stringify(hrPdfs));
+  localStorage.setItem('hr_extra',   JSON.stringify(hrExtra));
+
+  // Firebase 저장 (비동기, 백그라운드)
+  try {
+    const batch = db.batch();
+    batch.set(db.collection('system').doc('accounts'), {list: accounts});
+    batch.set(db.collection('system').doc('persons'),  {list: persons});
+    batch.set(db.collection('evalData').doc(getActiveKey()), {data: evalData, updatedAt: firebase.firestore.FieldValue.serverTimestamp()});
+    batch.set(db.collection('hr').doc('persons'), {list: hrPersons});
+    await batch.commit();
+  } catch(err) {
+    console.warn('Firebase 저장 실패 (로컬 저장됨):', err);
+    showToast('⚠️ 온라인 저장 실패. 로컬에만 저장됨.');
+  }
+}
+
+// 평가 데이터만 빠르게 저장
+async function saveEvalOnly() {
+  localStorage.setItem(getActiveKey(), JSON.stringify(evalData));
+  try {
+    await db.collection('evalData').doc(getActiveKey()).set(
+      {data: evalData, updatedAt: firebase.firestore.FieldValue.serverTimestamp()}
+    );
+  } catch(err) {
+    console.warn('Firebase 평가 저장 실패:', err);
+  }
+}
+
+// 분기별 평가 데이터 로드 (조회용)
+async function loadQuarterData(year, quarter) {
+  const key = getQuarterKey(year, quarter);
+  try {
+    const doc = await db.collection('evalData').doc(key).get();
+    return doc.exists ? doc.data().data : {};
+  } catch(err) {
+    return JSON.parse(localStorage.getItem(key) || '{}');
+  }
+}
+
+// 로딩 오버레이
+function showLoadingOverlay(show) {
+  let overlay = document.getElementById('loading-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(26,58,92,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;';
+    overlay.innerHTML = '<div style="width:40px;height:40px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite"></div><div style="color:#fff;font-size:14px;font-weight:600">데이터 불러오는 중...</div>';
+    document.head.insertAdjacentHTML('beforeend','<style>@keyframes spin{to{transform:rotate(360deg)}}</style>');
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = show ? 'flex' : 'none';
+}
+
+
+// ══ AUTH ══
+function doLogin() {
+  const id = document.getElementById('login-id').value.trim();
+  const pw = document.getElementById('login-pw').value;
+  const acc = accounts.find(a => a.id === id && a.pw === pw);
+  if (!acc) { document.getElementById('login-err').textContent = '사번 또는 비밀번호가 올바르지 않습니다.'; return; }
+  currentUser = acc;
+  document.getElementById('login-err').textContent = '';
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  initApp();
+}
+function resetAllData() {
+  if (!confirm('저장된 모든 데이터를 초기화하고 기본 계정으로 되돌립니다.\n\n계속하시겠습니까?')) return;
+  localStorage.clear();
+  alert('초기화 완료!\n\n관리자 계정: admin / admin1234\n평가자 계정: EMP001 / pass1234');
+  location.reload();
+}
+function doLogout() {
+  currentUser = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-id').value = '';
+  document.getElementById('login-pw').value = '';
+}
+
+// ══ INIT APP ══
+function initApp() {
+  const u = currentUser;
+  document.getElementById('sb-uname').textContent = u.name;
+  document.getElementById('sb-uid').textContent = (u.position||u.dept||'') + ' · 사번: ' + u.id;
+  const roleLabel = {admin:'👑 관리자', eval:'👤 평가자(부서장)', person:'🏷️ 피평가자(직책자)'}[u.role]||'👤';
+  document.getElementById('sb-role-tag').textContent = roleLabel;
+  document.getElementById('cur-user-badge').textContent = u.name + ' (' + (u.role==='admin'?'관리자':u.role==='eval'?'평가자(부서장)':'피평가자(직책자)') + ')';
+  document.getElementById('cur-user-badge').className = 'badge ' + (u.role==='admin'?'badge-gold':u.role==='eval'?'badge-purple':'badge-blue');
+
+  // 소속 표시: eval/person은 본인 소속, admin은 '관리자'
+  const userOrg = u.role==='admin' ? '관리자' : (u.dept||u.jijum||'');
+  const subEl = document.getElementById('app-sidebar-sub');
+  if (subEl) subEl.textContent = userOrg;
+
+  // topbar sub: 페이지 타이틀 아래 소속 표시
+  const topSub = document.getElementById('topbar-sub');
+  if (topSub) topSub.textContent = userOrg;
+
+  const nav = document.getElementById('sidebar-nav');
+  nav.innerHTML = '';
+  const adminMenus = [
+    {section:'현황'},
+    {page:'overview', icon:'📋', label:'직책자 현황'},
+    {page:'result',   icon:'📊', label:'전체 평가 결과'},
+    {section:'인사현황'},
+    {page:'hr-list',  icon:'👤', label:'인적사항 목록'},
+    {page:'hr-upload',icon:'📂', label:'인사 데이터 업로드'},
+    {section:'관리'},
+    {page:'persons',  icon:'👥', label:'직책자 관리'},
+    {page:'accounts', icon:'🔐', label:'계정 관리'},
+    {section:'기준'},
+    {page:'criteria', icon:'📌', label:'등급 기준'},
+  ];
+  const evalMenus = [
+    {section:'평가'},
+    {page:'my-overview', icon:'📋', label:'담당 직책자 현황'},
+    {page:'eval',        icon:'✏️',  label:'평가 입력'},
+    ...(u.hrView ? [
+      {section:'인사현황'},
+      {page:'hr-list', icon:'👤', label:'인적사항 목록'},
+    ] : []),
+    {section:'기준'},
+    {page:'criteria',    icon:'📌', label:'등급 기준'},
+  ];
+  const personMenus = [
+    {section:'내 정보'},
+    {page:'my-dashboard', icon:'🏷️', label:'내 평가 결과'},
+    {section:'기준'},
+    {page:'criteria',     icon:'📌', label:'등급 기준'},
+  ];
+  const menus = u.role==='admin' ? adminMenus : u.role==='eval' ? evalMenus : personMenus;
+  menus.forEach(m => {
+    if (m.section) {
+      nav.innerHTML += `<div class="nav-section">${m.section}</div>`;
+    } else {
+      nav.innerHTML += `<div class="nav-item" data-page="${m.page}" onclick="showPage('${m.page}')"><span class="nav-icon">${m.icon}</span>${m.label}</div>`;
+    }
+  });
+
+  const content = document.getElementById('main-content');
+  if (u.role==='admin') content.innerHTML = buildAdminPages() + buildHrPages();
+  else if (u.role==='eval') content.innerHTML = buildEvalPages() + (u.hrView ? buildHrListPage() : '');
+  else content.innerHTML = buildPersonPages();
+
+  const firstPage = u.role==='admin' ? 'overview' : u.role==='eval' ? 'my-overview' : 'my-dashboard';
+  showPage(firstPage);
+  if (u.role==='admin') updateQuarterUI();
+}
+
+// ══════════════════════
+//  PAGE BUILDER: ADMIN
+// ══════════════════════
+function buildAdminPages() {
+  return `
+  <!-- Overview -->
+  <div class="page" id="page-overview">
+    <!-- 분기 설정 바 -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:700;color:var(--primary)">📅 현재 활성 분기</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <select id="aq-year" class="form-input" style="width:90px;padding:6px 8px">
+          ${[2024,2025,2026,2027].map(y=>`<option value="${y}">${y}년</option>`).join('')}
+        </select>
+        <select id="aq-quarter" class="form-input" style="width:80px;padding:6px 8px">
+          ${[1,2,3,4].map(q=>`<option value="${q}">${q}분기</option>`).join('')}
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="setActiveQuarter()">설정</button>
+      </div>
+      <span id="aq-badge" class="badge badge-gold" style="font-size:12px"></span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <select id="view-quarter-sel" class="form-input" style="width:150px;padding:6px 8px" onchange="loadViewQuarter()">
+          <option value="">현재 분기 보기</option>
+        </select>
+        <span style="font-size:11px;color:var(--text-muted);align-self:center">← 과거 분기 조회</span>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">전체 직책자</div><div class="stat-val" id="stat-total">-</div><div class="stat-sub">등록 인원</div></div>
+      <div class="stat-card"><div class="stat-label">평가 완료</div><div class="stat-val" id="stat-done" style="color:var(--success)">0</div><div class="stat-sub"><div class="progress-bar"><div class="progress-fill" id="prog"></div></div></div></div>
+      <div class="stat-card"><div class="stat-label">인센티브 지급 대상</div><div class="stat-val" id="stat-incentive" style="color:var(--accent)">0</div><div class="stat-sub">지급 확정</div></div>
+      <div class="stat-card"><div class="stat-label">평균 점수</div><div class="stat-val" id="stat-avg" style="color:var(--primary)">-</div><div class="stat-sub">완료자 기준</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">■ 26년 직책자 평가 대상자</span>
+        <span style="margin-left:auto"><button class="btn btn-primary btn-sm" onclick="showPage('persons')">👥 직책자 관리</button></span>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info">※ 평가 등급 및 인센티브 지급 기준(직책 년차별 기준 상향) [실/팀장 공통 적용]</div>
+        <div class="tbl-wrap"><table id="overview-table">
+          <thead><tr>
+            <th>순번</th><th>이름</th><th>본부</th><th>지점</th><th>실/센터</th><th>팀</th><th>직급</th><th>직책</th><th>직책년차</th><th>비고</th><th>담당 평가자</th><th style="background:#e8b84b;color:#1a3a5c">1분기 평가</th>
+          </tr></thead>
+          <tbody id="overview-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="page" id="page-result">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📊 전체 평가 결과</span>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 CSV 내보내기</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="tbl-wrap"><table>
+          <thead><tr>
+            <th>순번</th><th>이름</th><th>직책</th><th>직책년차</th><th>담당평가자</th>
+            <th>공통①</th><th>공통②</th><th>공통③</th><th>직무전문성</th><th>조직관리</th>
+            <th>최종등급</th><th>점수</th><th>인센티브</th><th>서술등급</th><th>상태</th>
+          </tr></thead>
+          <tbody id="result-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Persons Admin -->
+  <div class="page" id="page-persons">
+    <!-- 엑셀 업로드 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📂 직책자 엑셀 업로드</span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-accent btn-sm" onclick="downloadPersonsTemplate()">📥 양식 다운로드</button>
+          <span style="font-size:11px;color:var(--text-muted)">업로드 시 기존 직책자 데이터 전체 교체</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
+          📌 양식을 다운받아 작성 후 업로드하세요.<br>
+          컬럼: <strong>순번 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책 | 직책급 | 직급 | 사원명 | 사번 | 회사메일 | 직책년차 | 비고 | 평가자</strong>
+          <br><span style="color:var(--text-muted)">※ '평가자' 컬럼은 계정에 등록된 <strong>이름</strong>과 일치해야 자동 매핑됩니다.</span>
+        </div>
+        <div class="upload-zone" id="upload-zone"
+          onclick="document.getElementById('excel-file').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          <div class="upload-icon">📊</div>
+          <div class="upload-text"><strong>직책자 엑셀 파일 클릭 또는 드래그</strong><br>.xlsx / .xls 지원</div>
+        </div>
+        <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)">
+        <div class="upload-result" id="upload-result"></div>
+      </div>
+    </div>
+    <!-- 직책자 목록 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">👥 직책자 목록</span>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="exportPersonsExcel()">📤 현재 목록 내보내기</button>
+          <button class="btn btn-primary btn-sm" onclick="openPModal()">+ 직책자 추가</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="tbl-wrap"><table>
+          <thead><tr>
+            <th>순번</th><th>사원명</th><th>사번</th><th>회사명</th><th>본부</th><th>지점</th><th>실/센터</th><th>팀</th><th>직책</th><th>직책급</th><th>직급</th><th>직책년차</th><th>비고</th><th>담당평가자</th><th>관리</th>
+          </tr></thead>
+          <tbody id="persons-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accounts Admin -->
+  <div class="page" id="page-accounts">
+
+    <!-- 계정 일괄 업로드 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📋 계정 일괄 업로드</span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-accent btn-sm" onclick="downloadAccountTemplate()">📥 양식 다운로드</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
+          📌 양식을 다운받아 작성 후 업로드하세요. <strong>계정 + 직책자 목록이 한 번에 반영됩니다.</strong><br>
+          컬럼: <strong>사번 | 이름 | 권한 | 소속 | 직책 | 비밀번호 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책급 | 직급 | 회사메일 | 직책년차 | 비고</strong><br>
+          <span style="color:var(--text-muted)">
+            권한: <strong>admin</strong>(관리자) / <strong>eval</strong>(평가자·부서장) / <strong>person</strong>(피평가자·직책자) &nbsp;·&nbsp;
+            비밀번호 비워두면 <strong>1111111</strong> 자동 설정<br>
+            ✨ <strong>자동 매핑:</strong> eval의 <strong>지점</strong> = person의 <strong>지점</strong>이 같으면 평가자 자동 연결
+          </span>
+        </div>
+        <div class="upload-zone" onclick="document.getElementById('acc-file').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleAccDrop(event)">
+          <div class="upload-icon">👥</div>
+          <div class="upload-text"><strong>계정 엑셀 파일 클릭 또는 드래그</strong><br>.xlsx / .xls</div>
+        </div>
+        <input type="file" id="acc-file" accept=".xlsx,.xls" style="display:none" onchange="handleAccUpload(event)">
+        <div class="upload-result" id="upload-result-acc"></div>
+      </div>
+    </div>
+
+    <!-- 비밀번호 일괄 업로드 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🔑 비밀번호 일괄 변경</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">사번 기준으로 비밀번호만 변경</span>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
+          📌 엑셀 형식: <strong>사번 | 비밀번호</strong> (1행 헤더, 2행부터 데이터)
+        </div>
+        <div class="upload-zone" id="upload-zone-pw"
+          onclick="document.getElementById('pw-file').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handlePwDrop(event)">
+          <div class="upload-icon">🔑</div>
+          <div class="upload-text"><strong>비밀번호 엑셀 파일 클릭 또는 드래그</strong><br>사번 | 비밀번호 형식 .xlsx / .xls</div>
+        </div>
+        <input type="file" id="pw-file" accept=".xlsx,.xls" style="display:none" onchange="handlePwUpload(event)">
+        <div class="upload-result" id="upload-result-pw"></div>
+      </div>
+    </div>
+
+    <!-- 계정 목록 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🔐 전체 계정 목록</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="exportAccountsExcel()">📤 현재 계정 내보내기</button>
+          <button class="btn btn-primary btn-sm" onclick="openAModal()">+ 계정 추가</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warning" style="font-size:12px">※ 비밀번호는 저장 후 확인이 불가합니다. 분실 시 새 비밀번호로 재설정하세요.</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>사번</th><th>이름</th><th>소속</th><th>직책</th><th>권한</th><th>인적사항조회</th><th>담당 직책자 수</th><th>관리</th></tr></thead>
+          <tbody id="accounts-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Criteria -->
+  <div class="page" id="page-criteria">${buildCriteriaHtml()}</div>
+  `;
+}
+
+// ══════════════════════
+//  PAGE BUILDER: EVAL
+// ══════════════════════
+function buildEvalPages() {
+  return `
+  <!-- My Overview -->
+  <div class="page" id="page-my-overview">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">담당 직책자</div><div class="stat-val" id="my-stat-total">-</div><div class="stat-sub">내 평가 대상</div></div>
+      <div class="stat-card"><div class="stat-label">평가 완료</div><div class="stat-val" id="my-stat-done" style="color:var(--success)">0</div><div class="stat-sub"><div class="progress-bar"><div class="progress-fill" id="my-prog"></div></div></div></div>
+      <div class="stat-card"><div class="stat-label">인센티브 지급 대상</div><div class="stat-val" id="my-stat-incentive" style="color:var(--accent)">0</div><div class="stat-sub">지급 확정</div></div>
+      <div class="stat-card"><div class="stat-label">평균 점수</div><div class="stat-val" id="my-stat-avg" style="color:var(--primary)">-</div><div class="stat-sub">완료자 기준</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">■ 담당 직책자 현황</span>
+        <span style="margin-left:auto"><button class="btn btn-accent btn-sm" onclick="showPage('eval')">✏️ 평가 입력하기</button></span>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info">※ 본인이 담당하는 직책자만 표시됩니다.</div>
+        <div class="tbl-wrap"><table id="my-overview-table">
+          <thead><tr>
+            <th>순번</th><th>이름</th><th>본부</th><th>실/센터</th><th>팀</th><th>직급</th><th>직책</th><th>직책년차</th><th>비고</th><th style="background:#e8b84b;color:#1a3a5c">1분기 평가</th>
+          </tr></thead>
+          <tbody id="my-overview-tbody"></tbody>
+        </table></div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">↑ 위 링크를 클릭하거나 [평가 입력하기] 버튼을 눌러 평가를 진행해주세요</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Eval Input -->
+  <div class="page" id="page-eval">
+    <div class="alert alert-warning">※ 평가 완료 후 반드시 [저장] 버튼을 눌러주세요.</div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <span class="card-title">✏️ 26년 1분기 직책자 평가</span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:var(--text-muted)">평가자</span>
+          <span style="font-size:13px;font-weight:700;color:var(--primary)" id="eval-username">-</span>
+          <button class="btn btn-success btn-sm" onclick="saveEval()">💾 저장</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="section-title">1. 직책 수행 능력 평가 <span style="font-size:11px;font-weight:400;color:var(--text-muted)">※ 인센티브 지급 유·무 결정</span></div>
+        <div class="grade-legend">
+          <div class="grade-pill"><div class="grade-dot" style="background:#e53935"></div>S: 100점</div>
+          <div class="grade-pill"><div class="grade-dot" style="background:#1565c0"></div>A(96): 우수</div>
+          <div class="grade-pill"><div class="grade-dot" style="background:#1976d2"></div>A(90): 우수</div>
+          <div class="grade-pill"><div class="grade-dot" style="background:#2e7d32"></div>B: 85점</div>
+          <div class="grade-pill"><div class="grade-dot" style="background:#e65100"></div>C: 75점</div>
+          <div class="grade-pill"><div class="grade-dot" style="background:#6b7a8d"></div>D/E: 미흡</div>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead>
+            <tr style="background:#1a3a5c">
+              <th style="color:#fff;background:#1a3a5c" rowspan="2">순번</th>
+              <th style="color:#fff;background:#1a3a5c" rowspan="2">이름</th>
+              <th style="color:#fff;background:#1a3a5c;min-width:110px">공통지표 ①<br><small style="font-weight:400">방향제시·동기부여</small></th>
+              <th style="color:#fff;background:#1a3a5c;min-width:110px">공통지표 ②<br><small style="font-weight:400">감정이해·피드백</small></th>
+              <th style="color:#fff;background:#1a3a5c;min-width:110px">공통지표 ③<br><small style="font-weight:400">해결책 도출</small></th>
+              <th style="color:#e8b84b;background:#1a3a5c;min-width:110px">직무전문성<br><small style="font-weight:400;color:#f5d78e">전문지식 활용</small></th>
+              <th style="color:#e8b84b;background:#1a3a5c;min-width:110px">조직관리능력<br><small style="font-weight:400;color:#f5d78e">팀 운영</small></th>
+              <th style="color:#fff;background:#2e7d32;min-width:90px" rowspan="2">등급<br>(자동)</th>
+              <th style="color:#fff;background:#2e7d32;min-width:70px" rowspan="2">점수<br>(자동)</th>
+            </tr>
+            <tr style="background:#e8f0fe">
+              <th style="font-size:10px;font-weight:400;color:#1a3a5c">목표 달성을 위해 팀원에게 명확한 방향 제시·동기 부여하는가?</th>
+              <th style="font-size:10px;font-weight:400;color:#1a3a5c">팀원의 감정·상황을 이해하며 적절한 피드백·지원을 제공하는가?</th>
+              <th style="font-size:10px;font-weight:400;color:#1a3a5c">갈등 상황에서 공감적 태도로 중재하며 납득할 해결책을 도출하는가?</th>
+              <th style="font-size:10px;font-weight:400;color:#1a3a5c">전문 지식·경험을 활용하여 업무를 안정적으로 수행하는가?</th>
+              <th style="font-size:10px;font-weight:400;color:#1a3a5c">구성원 간 협업이 원활하도록 팀을 운영하고 있는가?</th>
+            </tr>
+          </thead>
+          <tbody id="eval-tbody"></tbody>
+        </table></div>
+
+        <div class="divider"></div>
+        <div class="section-title">2. 부서장 서술 평가 <span style="font-size:11px;font-weight:400;color:var(--text-muted)">※ 종합평가 반영 예정 (인센티브 지급과 무관)</span></div>
+        <div class="alert alert-info" style="font-size:11px">평가 항목은 부서장님께서 자율적으로 작성해 주시기 바랍니다. [1분기에 작성한 항목은 2·3·4분기에도 동일 적용]</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr>
+            <th>순번</th><th>이름</th><th style="min-width:150px">평가 항목 자유 작성</th>
+            <th style="min-width:280px;background:#e8b84b;color:#1a3a5c">현 업무 평가 및 발전적인 측면 보완/기대</th>
+            <th>서술등급</th><th>점수</th>
+          </tr></thead>
+          <tbody id="comment-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Criteria -->
+  <div class="page" id="page-criteria">${buildCriteriaHtml()}</div>
+  `;
+}
+
+function buildCriteriaHtml() {
+  return `
+  <div class="card">
+    <div class="card-header"><span class="card-title">📌 평가 등급 기준</span></div>
+    <div class="card-body">
+      <div class="alert alert-info">직책 년차별 기준 상향 적용 [실/팀장 공통 적용]</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>등급</th><th>구분</th><th>판단 기준</th><th>점수</th><th>1~2년차</th><th>3년차 이상</th></tr></thead>
+        <tbody>
+          <tr><td><strong class="grade-S">S등급</strong></td><td>매우 우수</td><td class="td-left">기대 수준을 상회하여 목표를 조기 달성하고, 조직 성과의 비약적 성장을 이끌어냄</td><td>100점</td><td class="incentive-y">지급</td><td class="incentive-y">지급</td></tr>
+          <tr><td><strong class="grade-A">A등급</strong></td><td>우수</td><td class="td-left">기대 수준을 충족하여 계획에 따라 목표를 달성하고, 조직을 안정적으로 운영함</td><td>99~90점</td><td class="incentive-y">지급</td><td class="incentive-y">지급</td></tr>
+          <tr><td><strong class="grade-B">B등급</strong></td><td>양호</td><td class="td-left">기대 수준에 도달하였으나, 조직 운영 측면에서 일부 보완이 필요함</td><td>89~80점</td><td class="incentive-y">지급</td><td class="incentive-n">미지급</td></tr>
+          <tr><td><strong class="grade-C">C등급</strong></td><td>보통</td><td class="td-left">기대 수준에 일부 미치지 못해 목표 달성과 조직 운영 전반에 개선이 필요함</td><td>79~70점</td><td class="incentive-n">미지급</td><td class="incentive-n">미지급</td></tr>
+          <tr><td><strong class="grade-D">D등급</strong></td><td>미흡</td><td class="td-left">기대 수준에 전반적으로 미치지 못하여 목표 달성에 차질이 발생하고, 조직 운영에 어려움이 나타남</td><td>69~60점</td><td class="incentive-n">미지급</td><td class="incentive-n">미지급</td></tr>
+          <tr><td><strong class="grade-E">E등급</strong></td><td>매우 미흡</td><td class="td-left">기대 수준을 현저히 하회하여 목표 달성 및 조직 운영이 어렵다고 판단됨</td><td>59점 미만</td><td class="incentive-n">미지급</td><td class="incentive-n">미지급</td></tr>
+        </tbody>
+      </table></div>
+      <div class="divider"></div>
+      <div class="section-title">점수 산출 기준</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>등급</th><th>S</th><th>A(상)</th><th>A(하)</th><th>B</th><th>C</th><th>D</th><th>E</th></tr></thead>
+        <tbody><tr><td class="td-left">배점 (5개 항목 평균 자동 계산)</td>
+          <td><strong class="grade-S">100</strong></td><td>96</td><td>90</td><td>85</td><td>75</td><td>65</td><td>55</td>
+        </tr></tbody>
+      </table></div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════
+//  PAGE BUILDER: PERSON (직책자)
+// ══════════════════════
+function buildPersonPages() {
+  return `
+  <div class="page" id="page-my-dashboard">
+    <div id="person-dashboard-content"></div>
+  </div>
+  <div class="page" id="page-criteria">${buildCriteriaHtml()}</div>
+  `;
+}
+
+function renderMyDashboard() {
+  const u = currentUser;
+  const p = persons.find(x => x.sabun === u.id);
+  const container = document.getElementById('person-dashboard-content');
+  if (!container) return;
+
+  if (!p) {
+    container.innerHTML = `<div class="alert alert-warning">등록된 직책자 정보가 없습니다. 관리자에게 문의하세요.</div>`;
+    return;
+  }
+
+  const d = evalData[p.no] || {};
+  const score = calcScore(d);
+  const grade = calcGrade(score);
+  const incv = score !== null ? isIncentive(grade, p.nyeoncha) : null;
+  const cs = {S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+
+  const gradeColor = {S:'#c62828',A:'#1565c0',B:'#2e7d32',C:'#e65100',D:'#6b7a8d',E:'#6b7a8d'};
+  const gColor = grade ? (gradeColor[grade]||'#1a3a5c') : '#aaa';
+
+  // 인센티브 뱃지
+  const incvBadge = incv === null
+    ? `<span style="background:#eee;color:#999;padding:6px 18px;border-radius:20px;font-size:13px;font-weight:600">평가 전</span>`
+    : incv
+      ? `<span style="background:#ffebee;color:#c62828;padding:6px 18px;border-radius:20px;font-size:14px;font-weight:700">✅ 지급</span>`
+      : `<span style="background:#eee;color:#6b7a8d;padding:6px 18px;border-radius:20px;font-size:14px;font-weight:700">❌ 미지급</span>`;
+
+  // 항목별 등급 표시
+  const gradeItems = [
+    {label:'공통지표 ① 방향제시·동기부여', val:d.g1},
+    {label:'공통지표 ② 감정이해·피드백',   val:d.g2},
+    {label:'공통지표 ③ 해결책 도출',        val:d.g3},
+    {label:'직무전문성',                      val:d.g4},
+    {label:'조직관리능력',                    val:d.g5},
+  ];
+
+  container.innerHTML = `
+    <!-- 인사 정보 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🏷️ 내 기본 정보</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">기준일: 26.01.31</span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+          ${[
+            {l:'성명',    v:p.name},
+            {l:'사번',    v:p.sabun||'-'},
+            {l:'본부',    v:p.bonbu},
+            {l:'지점',    v:p.jijum},
+            {l:'실/센터', v:p.sil},
+            {l:'팀',      v:p.team||'-'},
+            {l:'직급',    v:p.jikgup},
+            {l:'직책',    v:p.jikchek},
+            {l:'직책급',  v:p.jikchekgup||'-'},
+            {l:'직책년차',v:p.nyeoncha},
+            {l:'담당평가자', v:getEvaluatorName(p.evaluatorId)},
+            {l:'비고',    v:p.bigo||'-'},
+          ].map(item=>`
+            <div style="background:var(--bg);border-radius:8px;padding:12px 14px;">
+              <div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">${item.l}</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${item.v}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- 평가 결과 요약 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
+      <div class="stat-card" style="text-align:center;border-top:4px solid ${gColor}">
+        <div class="stat-label">1분기 최종 등급</div>
+        <div style="font-size:40px;font-weight:800;color:${gColor};line-height:1.2;margin:6px 0">${grade||'-'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${grade ? ({S:'매우 우수',A:'우수',B:'양호',C:'보통',D:'미흡',E:'매우 미흡'}[grade]||'') : '평가 전'}</div>
+      </div>
+      <div class="stat-card" style="text-align:center;border-top:4px solid var(--primary)">
+        <div class="stat-label">1분기 점수</div>
+        <div style="font-size:40px;font-weight:800;color:var(--primary);line-height:1.2;margin:6px 0">${score !== null ? score : '-'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${score !== null ? '점' : '평가 전'}</div>
+      </div>
+      <div class="stat-card" style="text-align:center;border-top:4px solid var(--accent)">
+        <div class="stat-label">인센티브 지급 여부</div>
+        <div style="margin:10px 0">${incvBadge}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${p.nyeoncha} 기준</div>
+      </div>
+    </div>
+
+    <!-- 항목별 평가 결과 -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">📊 항목별 평가 결과</span></div>
+      <div class="card-body">
+        ${d.done ? `
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>평가 항목</th><th style="width:80px">등급</th><th style="width:80px">점수</th></tr></thead>
+          <tbody>
+            ${gradeItems.map(item=>{
+              const sc = cs[item.val]||'-';
+              const gc = item.val ? gradeColor[item.val[0]]||'#333' : '#aaa';
+              return `<tr>
+                <td class="td-left">${item.label}</td>
+                <td><strong style="color:${gc};font-size:14px">${item.val||'-'}</strong></td>
+                <td><strong>${sc}</strong></td>
+              </tr>`;
+            }).join('')}
+            <tr style="background:#f0f3f8;font-weight:700">
+              <td class="td-left">최종 (평균)</td>
+              <td><strong style="color:${gColor};font-size:14px">${grade||'-'}</strong></td>
+              <td><strong style="color:var(--primary)">${score !== null ? score : '-'}</strong></td>
+            </tr>
+          </tbody>
+        </table></div>` : `
+        <div class="alert alert-warning" style="text-align:center;padding:24px">
+          📋 아직 평가가 완료되지 않았습니다. 평가 완료 후 결과가 표시됩니다.
+        </div>`}
+      </div>
+    </div>
+
+    <!-- 부서장 서술 코멘트 -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">💬 부서장 서술 평가</span></div>
+      <div class="card-body">
+        ${(d.comment || d.topic) ? `
+        <div style="display:grid;gap:10px;">
+          ${d.topic ? `<div style="background:var(--bg);border-radius:8px;padding:12px 16px;">
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">평가 항목</div>
+            <div style="font-size:13px;color:var(--text)">${d.topic}</div>
+          </div>` : ''}
+          ${d.comment ? `<div style="background:#fffde7;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:14px 16px;">
+            <div style="font-size:10px;color:#b7791f;font-weight:700;margin-bottom:6px">현 업무 평가 및 발전적 측면 보완/기대</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.7">${d.comment}</div>
+          </div>` : ''}
+          ${d.cGrade ? `<div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;color:var(--text-muted)">서술 평가 등급</span>
+            <strong class="${gradeClass(d.cGrade)}" style="font-size:16px">${d.cGrade}등급</strong>
+            <strong style="color:var(--primary)">${cs[d.cGrade]||'-'}점</strong>
+          </div>` : ''}
+        </div>` : `
+        <div class="alert alert-info" style="text-align:center;padding:20px">
+          💬 부서장 서술 평가가 아직 작성되지 않았습니다.
+        </div>`}
+      </div>
+    </div>
+  `;
+}
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pg = document.getElementById('page-' + name);
+  if (!pg) return;
+  pg.classList.add('active');
+  const navEl = document.querySelector(`[data-page="${name}"]`);
+  if (navEl) navEl.classList.add('active');
+
+  const titles = {
+    'overview':'직책자 현황', 'result':'전체 평가 결과', 'persons':'직책자 관리',
+    'accounts':'계정 관리', 'criteria':'등급 기준',
+    'my-overview':'담당 직책자 현황', 'eval':'평가 입력',
+    'my-dashboard':'내 평가 결과',
+    'hr-list':'인적사항 목록', 'hr-upload':'인사 데이터 업로드', 'hr-detail':'개인 상세 카드',
+  };
+  document.getElementById('topbar-title').textContent = titles[name] || name;
+  // topbar-sub는 소속 유지
+  const userOrg2 = currentUser.role==='admin' ? '관리자' : (currentUser.dept||currentUser.jijum||'');
+  const ts = document.getElementById('topbar-sub');
+  if (ts) ts.textContent = userOrg2;
+
+  if (name==='overview')    renderAdminOverview();
+  if (name==='result')      renderResult();
+  if (name==='persons')     renderPersonsAdmin();
+  if (name==='accounts')    renderAccountsAdmin();
+  if (name==='my-overview') renderMyOverview();
+  if (name==='eval')        renderEvalForm();
+  if (name==='my-dashboard')renderMyDashboard();
+  if (name==='hr-list')     renderHrList();
+  if (name==='hr-upload')   renderHrUpload();
+}
+
+// ══════════════════════
+//  CALC HELPERS
+// ══════════════════════
+function calcScore(d) {
+  const vals = [d.g1,d.g2,d.g3,d.g4,d.g5].map(g => GRADE_SCORES[g]||0);
+  if (vals.every(v=>v>0)) return Math.round(vals.reduce((a,b)=>a+b,0)/5);
+  return null;
+}
+function calcGrade(score) {
+  if (score===null) return '';
+  if (score===100) return 'S';
+  if (score>=90) return 'A'; if (score>=80) return 'B';
+  if (score>=70) return 'C'; if (score>=60) return 'D'; return 'E';
+}
+function isIncentive(grade, nyeoncha) {
+  const y3 = parseInt(nyeoncha)>=3 || nyeoncha.startsWith('3') || nyeoncha.startsWith('4');
+  if (grade==='S'||grade==='A') return true;
+  if (grade==='B' && !y3) return true;
+  return false;
+}
+function gradeClass(g) {
+  if (!g) return ''; return 'grade-'+g;
+}
+function gradeOpt(sel) {
+  return GRADES.map(g=>`<option value="${g}"${sel===g?' selected':''}>${g==='A1'?'A(96)':g==='A2'?'A(90)':g}</option>`).join('');
+}
+function getEvaluatorName(id) {
+  const a = accounts.find(x=>x.id===id);
+  return a ? a.name : '-';
+}
+function getMyPersons() {
+  // active:false 인원 제외
+  return persons.filter(p => p.evaluatorId === currentUser.id && p.active !== false);
+}
+
+// ══════════════════════
+//  RENDER: ADMIN OVERVIEW
+// ══════════════════════
+function renderAdminOverview() {
+  updateAdminStats();
+  const tb = document.getElementById('overview-tbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  persons.forEach((p,i)=>{
+    const d = evalData[p.no]||{};
+    const score = calcScore(d); const grade = calcGrade(score);
+    tb.innerHTML += `<tr>
+      <td>${i+1}</td><td><strong>${p.name}</strong></td><td style="font-size:11px">${p.bonbu}</td>
+      <td>${p.jijum}</td><td>${p.sil}</td><td>${p.team}</td><td>${p.jikgup}</td><td>${p.jikchek}</td>
+      <td style="font-size:11px">${p.nyeoncha}</td>
+      <td style="font-size:10px;color:var(--text-muted)">${p.bigo}</td>
+      <td><span style="font-size:11px">${getEvaluatorName(p.evaluatorId)}</span></td>
+      <td>${d.done ? `<span class="${gradeClass(grade)}" style="font-weight:700">${grade}(${score}점)</span>` : `<span class="complete-chip chip-pending">미완료</span>`}</td>
+    </tr>`;
+  });
+}
+
+function updateAdminStats() {
+  const _ed = getDisplayEvalData();
+  let done=0, incentive=0, totalScore=0;
+  persons.filter(p=>p.active!==false).forEach(p=>{
+    const d=_ed[p.no]||{}; const score=calcScore(d); const grade=calcGrade(score);
+    if(d.done&&score!==null){done++;totalScore+=score;if(isIncentive(grade,p.nyeoncha))incentive++;}
+  });
+  const avg=done>0?Math.round(totalScore/done):null;
+  const t=document.getElementById('stat-total'); if(t)t.textContent=persons.filter(p=>p.active!==false).length;
+  const dd=document.getElementById('stat-done'); if(dd)dd.textContent=done;
+  const si=document.getElementById('stat-incentive'); if(si)si.textContent=incentive;
+  const sa=document.getElementById('stat-avg'); if(sa)sa.textContent=avg!==null?avg+'점':'-';
+  const pr=document.getElementById('prog'); if(pr)pr.style.width=(persons.length>0?done/persons.length*100:0)+'%';
+  const db=document.getElementById('done-badge');
+  const pb=document.getElementById('pending-badge');
+  if(db){db.textContent='완료: '+done+'명';db.style.display='inline-flex';}
+  if(pb){pb.textContent='미완료: '+(persons.length-done)+'명';pb.style.display='inline-flex';}
+}
+
+// ══════════════════════
+//  RENDER: RESULT
+// ══════════════════════
+function renderResult() {
+  const tb = document.getElementById('result-tbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  const _ed = getDisplayEvalData();
+  persons.forEach((p,i)=>{
+    const d=_ed[p.no]||{}; const score=calcScore(d); const grade=calcGrade(score);
+    const incv=score!==null?isIncentive(grade,p.nyeoncha):false;
+    const cs={S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+    tb.innerHTML+=`<tr>
+      <td>${i+1}</td><td><strong>${p.name}</strong></td><td>${p.jikchek}</td><td style="font-size:11px">${p.nyeoncha}</td>
+      <td style="font-size:11px">${getEvaluatorName(p.evaluatorId)}</td>
+      <td>${d.g1||'-'}</td><td>${d.g2||'-'}</td><td>${d.g3||'-'}</td><td>${d.g4||'-'}</td><td>${d.g5||'-'}</td>
+      <td><span class="${gradeClass(grade)}">${grade||'-'}</span></td>
+      <td><strong>${score!==null?score:'-'}</strong></td>
+      <td class="${score!==null?(incv?'incentive-y':'incentive-n'):''}">${score!==null?(incv?'지급':'미지급'):'-'}</td>
+      <td><span class="${gradeClass(d.cGrade)}">${d.cGrade||'-'}</span></td>
+      <td>${d.done?'<span class="complete-chip chip-done">완료</span>':'<span class="complete-chip chip-pending">미완료</span>'}</td>
+    </tr>`;
+  });
+  updateAdminStats();
+}
+
+// ══════════════════════
+//  RENDER: PERSONS ADMIN
+// ══════════════════════
+function renderPersonsAdmin() {
+  const tb = document.getElementById('persons-tbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  const active   = persons.filter(p=>p.active!==false);
+  const inactive = persons.filter(p=>p.active===false);
+
+  active.forEach((p,i)=>{
+    tb.innerHTML+=`<tr>
+      <td>${i+1}</td>
+      <td><strong>${p.name}</strong></td>
+      <td style="font-size:11px;color:var(--text-muted)">${p.sabun||'-'}</td>
+      <td style="font-size:11px">${p.company||'-'}</td>
+      <td style="font-size:11px">${p.bonbu}</td>
+      <td>${p.jijum}</td>
+      <td>${p.sil}</td>
+      <td>${p.team||'-'}</td>
+      <td>${p.jikchek}</td>
+      <td style="font-size:11px">${p.jikchekgup||'-'}</td>
+      <td>${p.jikgup}</td>
+      <td style="font-size:11px">${p.nyeoncha}</td>
+      <td style="font-size:10px;color:var(--text-muted);max-width:120px">${p.bigo||'-'}</td>
+      <td style="font-size:11px">${getEvaluatorName(p.evaluatorId)}</td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-outline btn-sm" onclick="openPModal(${p.no})">수정</button>
+          <button class="btn btn-danger btn-sm" onclick="deletePerson(${p.no})">삭제</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  // 비활성 인원 구분선 + 표시
+  if (inactive.length) {
+    tb.innerHTML += `<tr><td colspan="15" style="background:#fff8e1;padding:8px 14px;font-size:12px;color:#b7791f;font-weight:700;text-align:left">
+      ⚠️ 비활성 인원 (${inactive.length}명) — 엑셀 미포함으로 숨김 처리됨. 데이터는 유지됩니다.
+    </td></tr>`;
+    inactive.forEach((p,i)=>{
+      tb.innerHTML+=`<tr style="opacity:0.45;background:#fafafa">
+        <td style="color:var(--text-muted)">-</td>
+        <td><strong>${p.name}</strong> <span style="font-size:10px;color:#b7791f">[비활성]</span></td>
+        <td style="font-size:11px">${p.sabun||'-'}</td>
+        <td style="font-size:11px">${p.company||'-'}</td>
+        <td style="font-size:11px">${p.bonbu}</td>
+        <td>${p.jijum}</td>
+        <td>${p.sil}</td>
+        <td>${p.team||'-'}</td>
+        <td>${p.jikchek}</td>
+        <td>${p.jikchekgup||'-'}</td>
+        <td>${p.jikgup}</td>
+        <td>${p.nyeoncha}</td>
+        <td>${p.bigo||'-'}</td>
+        <td>${getEvaluatorName(p.evaluatorId)}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="reactivatePerson(${p.no})">재활성화</button>
+        </td>
+      </tr>`;
+    });
+  }
+}
+
+// ══════════════════════
+//  RENDER: ACCOUNTS ADMIN
+// ══════════════════════
+function renderAccountsAdmin() {
+  const tb = document.getElementById('accounts-tbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  accounts.forEach(a=>{
+    const cnt = a.role==='eval' ? persons.filter(p=>p.evaluatorId===a.id).length : '-';
+    const roleLabel = {admin:'관리자', eval:'평가자(부서장)', person:'피평가자(직책자)'}[a.role]||a.role;
+    const roleCls   = {admin:'role-admin', eval:'role-eval', person:'role-person'}[a.role]||'';
+    const hrBadge = a.role==='eval'
+      ? (a.hrView
+          ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">✅ 허용</span>'
+          : '<span style="background:#eee;color:#999;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">❌ 미허용</span>')
+      : '-';
+    tb.innerHTML+=`<tr>
+      <td><strong>${a.id}</strong></td>
+      <td>${a.name}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${a.dept||'-'}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${a.position||'-'}</td>
+      <td><span class="${roleCls}">${roleLabel}</span></td>
+      <td>${hrBadge}</td>
+      <td>${typeof cnt==='number'?cnt+'명':'-'}</td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-outline btn-sm" onclick="openAModal('${a.id}')">수정</button>
+          ${a.id!=='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteAccount('${a.id}')">삭제</button>`:'<span style="font-size:10px;color:var(--text-muted)">기본계정</span>'}
+        </div>
+      </td>
+    </tr>`;
+  });
+}
+
+// ══════════════════════
+//  RENDER: MY OVERVIEW (평가자)
+// ══════════════════════
+function renderMyOverview() {
+  const myP = getMyPersons();
+  let done=0,incentive=0,totalScore=0;
+  myP.forEach(p=>{
+    const d=evalData[p.no]||{}; const score=calcScore(d); const grade=calcGrade(score);
+    if(d.done&&score!==null){done++;totalScore+=score;if(isIncentive(grade,p.nyeoncha))incentive++;}
+  });
+  const avg=done>0?Math.round(totalScore/done):null;
+  const setEl=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  setEl('my-stat-total',myP.length);setEl('my-stat-done',done);setEl('my-stat-incentive',incentive);
+  setEl('my-stat-avg',avg!==null?avg+'점':'-');
+  const pr=document.getElementById('my-prog');if(pr)pr.style.width=(myP.length>0?done/myP.length*100:0)+'%';
+
+  const db=document.getElementById('done-badge');const pb=document.getElementById('pending-badge');
+  if(db){db.textContent='완료: '+done+'명';db.style.display='inline-flex';}
+  if(pb){pb.textContent='미완료: '+(myP.length-done)+'명';pb.style.display='inline-flex';}
+
+  const tb=document.getElementById('my-overview-tbody');
+  if(!tb)return;
+  tb.innerHTML='';
+  myP.forEach((p,i)=>{
+    const d=evalData[p.no]||{}; const score=calcScore(d); const grade=calcGrade(score);
+    tb.innerHTML+=`<tr>
+      <td>${i+1}</td><td><strong>${p.name}</strong></td><td style="font-size:11px">${p.bonbu}</td>
+      <td>${p.sil}</td><td>${p.team}</td><td>${p.jikgup}</td><td>${p.jikchek}</td>
+      <td style="font-size:11px">${p.nyeoncha}</td>
+      <td style="font-size:10px;color:var(--text-muted)">${p.bigo}</td>
+      <td>${d.done?`<span class="${gradeClass(grade)}" style="font-weight:700">${grade}(${score}점)</span>`
+        :`<a href="#" onclick="showPage('eval');return false;" style="color:var(--primary);font-size:11px;text-decoration:underline">평가 하기</a>`}</td>
+    </tr>`;
+  });
+}
+
+// ══════════════════════
+//  RENDER: EVAL FORM (평가자)
+// ══════════════════════
+function renderEvalForm() {
+  const u = document.getElementById('eval-username');
+  if(u) u.textContent = currentUser.name;
+  const myP = getMyPersons();
+  const evalTb=document.getElementById('eval-tbody');
+  const commentTb=document.getElementById('comment-tbody');
+  if(!evalTb||!commentTb)return;
+  evalTb.innerHTML='';commentTb.innerHTML='';
+  myP.forEach((p,i)=>{
+    const d=evalData[p.no]||{g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
+    const score=calcScore(d); const grade=calcGrade(score);
+    const incv=score!==null?isIncentive(grade,p.nyeoncha):false;
+    evalTb.innerHTML+=`<tr>
+      <td>${i+1}</td><td><strong>${p.name}</strong></td>
+      <td><select class="grade-sel" onchange="updateGrade(${p.no},'g1',this.value)"><option value="">-</option>${gradeOpt(d.g1)}</select></td>
+      <td><select class="grade-sel" onchange="updateGrade(${p.no},'g2',this.value)"><option value="">-</option>${gradeOpt(d.g2)}</select></td>
+      <td><select class="grade-sel" onchange="updateGrade(${p.no},'g3',this.value)"><option value="">-</option>${gradeOpt(d.g3)}</select></td>
+      <td><select class="grade-sel" onchange="updateGrade(${p.no},'g4',this.value)"><option value="">-</option>${gradeOpt(d.g4)}</select></td>
+      <td><select class="grade-sel" onchange="updateGrade(${p.no},'g5',this.value)"><option value="">-</option>${gradeOpt(d.g5)}</select></td>
+      <td id="eg-${p.no}"><span class="${gradeClass(grade)}">${grade?(grade+(incv?' (지급)':' (미지급)')):'-'}</span></td>
+      <td id="es-${p.no}"><span class="score-display">${score!==null?score+' 점':'-'}</span></td>
+    </tr>`;
+    const cs={S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+    commentTb.innerHTML+=`<tr>
+      <td>${i+1}</td><td><strong>${p.name}</strong></td>
+      <td><input style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:11px;" placeholder="평가 항목 입력..." value="${d.topic||''}" onchange="updateComment(${p.no},'topic',this.value)"></td>
+      <td><textarea class="comment" placeholder="현 업무 평가 및 발전적인 측면에서 보완/기대 사항..." onchange="updateComment(${p.no},'comment',this.value)">${d.comment||''}</textarea></td>
+      <td>
+        <select class="grade-sel" onchange="updateComment(${p.no},'cGrade',this.value)">
+          <option value="">-</option>
+          ${['S','A','B','C','D'].map(g=>`<option value="${g}"${d.cGrade===g?' selected':''}>${g}</option>`).join('')}
+        </select>
+      </td>
+      <td id="cs-${p.no}"><span class="score-display">${d.cGrade?(cs[d.cGrade]||'-'):'-'}</span></td>
+    </tr>`;
+  });
+}
+
+function updateGrade(no, field, val) {
+  if(!evalData[no])evalData[no]={g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
+  evalData[no][field]=val;
+  const d=evalData[no]; const score=calcScore(d); const grade=calcGrade(score);
+  const incv=score!==null?isIncentive(grade,persons.find(p=>p.no===no)?.nyeoncha||''):false;
+  const eg=document.getElementById('eg-'+no);const es=document.getElementById('es-'+no);
+  if(eg)eg.innerHTML=`<span class="${gradeClass(grade)}">${grade?(grade+(incv?' (지급)':' (미지급)')):'-'}</span>`;
+  if(es)es.innerHTML=`<span class="score-display">${score!==null?score+' 점':'-'}</span>`;
+  if([d.g1,d.g2,d.g3,d.g4,d.g5].every(g=>g!==''))evalData[no].done=true;
+}
+
+function updateComment(no, field, val) {
+  if(!evalData[no])evalData[no]={g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
+  evalData[no][field]=val;
+  if(field==='cGrade'){
+    const cs={S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+    const el=document.getElementById('cs-'+no);
+    if(el)el.innerHTML=`<span class="score-display">${val?(cs[val]||'-'):'-'}</span>`;
+  }
+}
+
+function saveEval() { saveEvalOnly(); showToast('💾 저장 완료!'); renderMyOverview(); }
+
+// ══════════════════════
+//  PERSON MODAL
+// ══════════════════════
+function openPModal(no) {
+  editingPersonNo = no || null;
+  document.getElementById('modal-person-title').textContent = no ? '직책자 수정' : '직책자 추가';
+  const sel = document.getElementById('fp-evaluator');
+  sel.innerHTML = '<option value="">-- 평가자 선택 --</option>';
+  accounts.filter(a=>a.role==='eval').forEach(a=>{
+    sel.innerHTML+=`<option value="${a.id}">${a.name} (${a.id})</option>`;
+  });
+  if (no) {
+    const p = persons.find(x=>x.no===no);
+    document.getElementById('fp-name').value=p.name;
+    document.getElementById('fp-sabun').value=p.sabun||'';
+    document.getElementById('fp-company').value=p.company||'';
+    document.getElementById('fp-bonbu').value=p.bonbu;
+    document.getElementById('fp-jijum').value=p.jijum;
+    document.getElementById('fp-sil').value=p.sil;
+    document.getElementById('fp-team').value=p.team;
+    document.getElementById('fp-jikchek').value=p.jikchek;
+    document.getElementById('fp-jikchekgup').value=p.jikchekgup||'';
+    document.getElementById('fp-jikgup').value=p.jikgup;
+    document.getElementById('fp-email').value=p.email||'';
+    document.getElementById('fp-nyeoncha').value=p.nyeoncha;
+    document.getElementById('fp-bigo').value=p.bigo;
+    sel.value=p.evaluatorId||'';
+  } else {
+    ['fp-name','fp-sabun','fp-company','fp-bonbu','fp-jijum','fp-sil','fp-team','fp-jikchek','fp-jikchekgup','fp-jikgup','fp-email','fp-nyeoncha','fp-bigo'].forEach(id=>document.getElementById(id).value='');
+  }
+  document.getElementById('modal-person').classList.add('show');
+}
+function closePModal(){document.getElementById('modal-person').classList.remove('show');}
+function savePerson() {
+  const name=document.getElementById('fp-name').value.trim();
+  if(!name){showToast('사원명을 입력하세요.');return;}
+  const data={
+    name,
+    sabun:document.getElementById('fp-sabun').value,
+    company:document.getElementById('fp-company').value,
+    bonbu:document.getElementById('fp-bonbu').value,
+    jijum:document.getElementById('fp-jijum').value,
+    sil:document.getElementById('fp-sil').value,
+    team:document.getElementById('fp-team').value,
+    jikchek:document.getElementById('fp-jikchek').value,
+    jikchekgup:document.getElementById('fp-jikchekgup').value,
+    jikgup:document.getElementById('fp-jikgup').value,
+    email:document.getElementById('fp-email').value,
+    nyeoncha:document.getElementById('fp-nyeoncha').value,
+    bigo:document.getElementById('fp-bigo').value,
+    evaluatorId:document.getElementById('fp-evaluator').value
+  };
+  if(editingPersonNo){
+    const idx=persons.findIndex(x=>x.no===editingPersonNo);
+    persons[idx]={...persons[idx],...data};
+    showToast('✅ 직책자 정보가 수정되었습니다.');
+  } else {
+    const newNo = persons.length>0 ? Math.max(...persons.map(p=>p.no))+1 : 1;
+    persons.push({no:newNo,...data});
+    evalData[newNo]={g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
+    showToast('✅ 직책자가 추가되었습니다.');
+  }
+  save(); closePModal(); renderPersonsAdmin();
+}
+function reactivatePerson(no) {
+  const p = persons.find(x=>x.no===no);
+  if (!p) return;
+  p.active = true;
+  save();
+  renderPersonsAdmin();
+  showToast(`✅ ${p.name} 재활성화됐습니다.`);
+}
+function deletePerson(no){
+  if(!confirm('삭제하시겠습니까?'))return;
+  persons=persons.filter(p=>p.no!==no);
+  save(); renderPersonsAdmin(); showToast('삭제되었습니다.');
+}
+
+// ══════════════════════
+//  ACCOUNT MODAL
+// ══════════════════════
+function openAModal(id) {
+  editingAccountId = id || null;
+  document.getElementById('modal-account-title').textContent = id ? '계정 수정' : '계정 추가';
+  if(id){
+    const a=accounts.find(x=>x.id===id);
+    document.getElementById('fa-id').value=a.id;
+    document.getElementById('fa-id').disabled=true;
+    document.getElementById('fa-pw').value='';
+    document.getElementById('fa-name').value=a.name;
+    document.getElementById('fa-role').value=a.role;
+    document.getElementById('fa-dept').value=a.dept||'';
+    document.getElementById('fa-position').value=a.position||'';
+    document.getElementById('fa-hrview').checked=!!(a.hrView);
+    const hrRow=document.getElementById('fa-hrview-row');
+    if(hrRow) hrRow.style.display=a.role==='eval'?'block':'none';
+  } else {
+    ['fa-id','fa-pw','fa-name','fa-dept','fa-position'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('fa-id').disabled=false;
+    document.getElementById('fa-role').value='eval';
+    document.getElementById('fa-hrview').checked=false;
+    const hrRow=document.getElementById('fa-hrview-row');
+    if(hrRow) hrRow.style.display='block';
+  }
+  document.getElementById('modal-account').classList.add('show');
+}
+function closeAModal(){
+  document.getElementById('modal-account').classList.remove('show');
+  document.getElementById('fa-id').disabled=false;
+}
+function saveAccount(){
+  const id=document.getElementById('fa-id').value.trim();
+  const pw=document.getElementById('fa-pw').value;
+  const name=document.getElementById('fa-name').value.trim();
+  const role=document.getElementById('fa-role').value;
+  const dept=document.getElementById('fa-dept').value;
+  const position=document.getElementById('fa-position').value;
+  const hrView=document.getElementById('fa-hrview').checked;
+  if(!id||!name){showToast('사번과 이름을 입력하세요.');return;}
+  if(editingAccountId){
+    const idx=accounts.findIndex(a=>a.id===editingAccountId);
+    accounts[idx]={...accounts[idx],name,role,dept,position,hrView};
+    if(pw) accounts[idx].pw=pw;
+    showToast('✅ 계정이 수정되었습니다.');
+  } else {
+    if(!pw){showToast('비밀번호를 입력하세요.');return;}
+    if(accounts.find(a=>a.id===id)){showToast('이미 존재하는 사번입니다.');return;}
+    accounts.push({id,pw,name,role,dept,position,hrView});
+    showToast('✅ 계정이 추가되었습니다.');
+  }
+  save(); closeAModal(); renderAccountsAdmin();
+}
+function deleteAccount(id){
+  if(id==='admin'){showToast('기본 관리자 계정은 삭제할 수 없습니다.');return;}
+  if(!confirm(id+' 계정을 삭제하시겠습니까?'))return;
+  accounts=accounts.filter(a=>a.id!==id);
+  save(); renderAccountsAdmin(); showToast('삭제되었습니다.');
+}
+
+// ══ EXCEL UPLOAD ══
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const file=e.dataTransfer.files[0];
+  if(file) parseExcel(file);
+}
+function handleExcelUpload(e){
+  const file=e.target.files[0];
+  if(file) parseExcel(file);
+  e.target.value='';
+}
+function parseExcel(file){
+  // 컬럼 순서: 순번(0) 회사명(1) 본부(2) 지점(3) 실/센터(4) 팀(5) 직책(6) 직책급(7) 직급(8) 사원명(9) 사번(10) 회사메일(11) 직책년차(12) 비고(13) 평가자(14)
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){showUploadResult('warn','데이터가 없습니다. 파일을 확인해주세요.');return;}
+
+      const parsed=[];
+      const warnings=[];
+      let nextNo=1;
+      let newPersonAccounts=0;
+
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        const rawName=String(r[9]||'').trim();
+        if(!rawName)continue;
+
+        // 평가자 이름으로 계정 ID 매핑
+        const evalName=String(r[14]||'').trim();
+        const evalAcc=accounts.find(a=>a.name===evalName&&a.role==='eval');
+        if(evalName&&!evalAcc){
+          warnings.push(`${rawName}: 평가자 '${evalName}' 을 계정에서 찾을 수 없어 미지정 처리됨`);
+        }
+
+        const sabun=String(r[10]||'').trim();
+
+        // 사번이 있으면 직책자 계정 자동 생성/업데이트
+        if(sabun){
+          const existing=accounts.find(a=>a.id===sabun);
+          if(!existing){
+            accounts.push({id:sabun, pw:'1111111', name:rawName, role:'person', dept:String(r[6]||'').trim()});
+            newPersonAccounts++;
+          } else if(existing.role==='person'){
+            // 이름 업데이트
+            existing.name=rawName;
+          }
+        }
+
+        parsed.push({
+          no:nextNo++,
+          name:rawName,
+          sabun,
+          company:String(r[1]||'').trim(),
+          bonbu:String(r[2]||'').trim(),
+          jijum:String(r[3]||'').trim(),
+          sil:String(r[4]||'').trim(),
+          team:String(r[5]||'').trim(),
+          jikchek:String(r[6]||'').trim(),
+          jikchekgup:String(r[7]||'').trim(),
+          jikgup:String(r[8]||'').trim(),
+          email:String(r[11]||'').trim(),
+          nyeoncha:String(r[12]||'').trim(),
+          bigo:String(r[13]||'').trim(),
+          evaluatorId:evalAcc?evalAcc.id:'',
+        });
+      }
+
+      if(parsed.length===0){showUploadResult('warn','유효한 데이터가 없습니다. 헤더 행 포함 2행 이상이어야 합니다.');return;}
+
+      // 전체 교체 — 기존 평가 데이터는 이름 기준으로 보존
+      const oldPersons=[...persons];
+      persons=parsed;
+      const newEvalData={};
+      parsed.forEach(p=>{
+        const old=oldPersons.find(o=>o.name===p.name);
+        newEvalData[p.no]=old&&evalData[old.no]?evalData[old.no]:{g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
+      });
+      evalData=newEvalData;
+      save();
+      renderPersonsAdmin();
+
+      let msg=`✅ ${parsed.length}명 업로드 완료`;
+      if(newPersonAccounts>0) msg+=` · 직책자 계정 ${newPersonAccounts}개 자동 생성 (초기 비밀번호: 1111111)`;
+      if(warnings.length) msg+=`<br><span style="color:#b7791f">⚠️ ${warnings.join('<br>')}</span>`;
+      showUploadResult(warnings.length?'warn':'ok',msg);
+    }catch(err){
+      showUploadResult('warn','파일을 읽는 중 오류가 발생했습니다: '+err.message);
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+// ══ 직책자 양식 다운로드 ══
+function downloadPersonsTemplate() {
+  const wb = XLSX.utils.book_new();
+  const headers = ['순번','회사명','본부','지점','실/센터','팀','직책','직책급','직급','사원명','사번','회사메일','직책년차','비고','평가자'];
+  const sample1 = [1,'이투스기술학원','O2O플랫폼사업본부','이투스기술학원','전략실','전략담임팀','팀장','1급','차장','홍길동','EMP001','hong@company.com','2년차 1분기','','곽용호'];
+  const ws = XLSX.utils.aoa_to_sheet([headers, sample1]);
+  ws['!cols'] = headers.map((_,i) => ({wch: i===14?14 : i===10||i===11?16 : 12}));
+  XLSX.utils.book_append_sheet(wb, ws, '직책자목록');
+  XLSX.writeFile(wb, '직책자_업로드_양식.xlsx');
+  showToast('📥 직책자 양식 다운로드 완료!');
+}
+
+// ══ 직책자 현재 목록 내보내기 ══
+function exportPersonsExcel() {
+  const headers = ['순번','회사명','본부','지점','실/센터','팀','직책','직책급','직급','사원명','사번','회사메일','직책년차','비고','평가자'];
+  const rows = [headers];
+  persons.forEach((p,i) => {
+    rows.push([
+      i+1, p.company||'', p.bonbu||'', p.jijum||'', p.sil||'', p.team||'',
+      p.jikchek||'', p.jikchekgup||'', p.jikgup||'', p.name||'',
+      p.sabun||'', p.email||'', p.nyeoncha||'', p.bigo||'',
+      getEvaluatorName(p.evaluatorId)||''
+    ]);
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = headers.map(() => ({wch:14}));
+  XLSX.utils.book_append_sheet(wb, ws, '직책자목록');
+  XLSX.writeFile(wb, '직책자목록_'+new Date().toLocaleDateString('ko-KR').replace(/[\. ]/g,'').slice(0,-1)+'.xlsx');
+  showToast('📤 직책자 목록 내보내기 완료!');
+}
+
+
+function downloadAccountTemplate() {
+  const wb = XLSX.utils.book_new();
+  const headers = ['사번','이름','권한','소속','직책','비밀번호','인적사항조회(Y/N)','회사명','본부','지점','실/센터','팀','직책급','직급','회사메일','직책년차','비고'];
+  const sample1 = ['EMP001','곽용호','eval','이투스기술학원','본부장','pass1234','Y','이투스기술학원','O2O플랫폼사업본부','이투스기술학원','','','','부장','','',''];
+  const sample2 = ['EMP002','홍길동','person','이투스기술학원','팀장','','','이투스기술학원','O2O플랫폼사업본부','이투스기술학원','전략실','전략담임팀','1급','차장','hong@company.com','2년차 1분기',''];
+  const sample3 = ['admin','관리자','admin','','','admin1234','','','','','','','','','','',''];
+  const ws = XLSX.utils.aoa_to_sheet([headers, sample1, sample2, sample3]);
+  ws['!cols'] = headers.map((_,i) => ({wch: i<6?14:12}));
+  if(!ws['C1'].c) ws['C1'].c=[];
+  ws['C1'].c.push({a:'System', t:'admin=관리자 / eval=평가자(부서장) / person=피평가자(직책자)'});
+  if(!ws['I1'].c) ws['I1'].c=[];
+  ws['I1'].c.push({a:'System', t:'eval의 지점 = person의 지점이 같으면 자동 매핑됩니다'});
+  XLSX.utils.book_append_sheet(wb, ws, '계정_직책자통합');
+  XLSX.writeFile(wb, '계정_직책자_통합양식.xlsx');
+  showToast('📥 통합 양식 다운로드 완료!');
+}
+
+// ══ 계정 일괄 업로드 ══
+function handleAccDrop(e) {
+  e.preventDefault(); e.currentTarget.classList.remove('drag');
+  const f = e.dataTransfer.files[0]; if(f) parseAccExcel(f);
+}
+function handleAccUpload(e) {
+  const f = e.target.files[0]; if(f) parseAccExcel(f); e.target.value='';
+}
+function parseAccExcel(file) {
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (rows.length < 2) { showAccResult('warn','데이터가 없습니다.'); return; }
+
+      // 컬럼: 사번(0) 이름(1) 권한(2) 소속(3) 직책(4) 비밀번호(5) 인적사항조회Y/N(6)
+      //        회사명(7) 본부(8) 지점(9) 실/센터(10) 팀(11) 직책급(12) 직급(13) 회사메일(14) 직책년차(15) 비고(16)
+      const VALID_ROLES = ['admin','eval','person'];
+      let accAdded=0, accUpdated=0, personAdded=0, personUpdated=0, skipped=[];
+      const allRows = [];
+
+      // 1단계: 전체 파싱 + 계정 처리
+      for (let i=1; i<rows.length; i++) {
+        const r = rows[i];
+        const id       = String(r[0]||'').trim();
+        const name     = String(r[1]||'').trim();
+        const role     = String(r[2]||'').trim().toLowerCase();
+        const dept     = String(r[3]||'').trim(); // 소속
+        const position = String(r[4]||'').trim(); // 직책(계정)
+        const pw       = String(r[5]||'').trim() || '1111111';
+        const hrView   = String(r[6]||'').trim().toUpperCase() === 'Y';
+        const company  = String(r[7]||'').trim();
+        const bonbu    = String(r[8]||'').trim();
+        const jijum    = String(r[9]||'').trim(); // 지점 ← 매칭 키
+        const sil      = String(r[10]||'').trim();
+        const team     = String(r[11]||'').trim();
+        const jikchekgup = String(r[12]||'').trim();
+        const jikgup   = String(r[13]||'').trim();
+        const email    = String(r[14]||'').trim();
+        const nyeoncha = String(r[15]||'').trim();
+        const bigo     = String(r[16]||'').trim();
+
+        if (!id || !name) continue;
+        if (!VALID_ROLES.includes(role)) {
+          skipped.push(`${name}(${id}): 권한값 오류 "${role}"`);
+          continue;
+        }
+        if (id==='admin' && role!=='admin') {
+          skipped.push(`${id}: 기본 관리자 계정 권한 변경 불가`);
+          continue;
+        }
+
+        // 계정 처리
+        const existing = accounts.find(a=>a.id===id);
+        if (existing) {
+          existing.name=name; existing.role=role;
+          existing.dept=dept; existing.position=position;
+          existing.jijum=jijum; existing.hrView=hrView;
+          if (String(r[5]||'').trim()) existing.pw=pw;
+          accUpdated++;
+        } else {
+          accounts.push({id, pw, name, role, dept, position, jijum, hrView});
+          accAdded++;
+        }
+
+        allRows.push({id, name, role, company, bonbu, jijum, sil, team,
+          jikchek:position, jikchekgup, jikgup, email, nyeoncha, bigo, sabun:id});
+      }
+
+      // 2단계: person 행만 → 직책자 목록 자동 등록
+      // 소속(dept) 기준으로 eval 계정 맵 생성 (jijum 폴백)
+      const evalMap = {};
+      accounts.filter(a=>a.role==='eval').forEach(a=>{
+        const key1 = (a.dept||'').trim();   // 소속 우선
+        const key2 = (a.jijum||'').trim();  // 지점 폴백
+        if (key1) evalMap[key1] = a.id;
+        if (key2 && !evalMap[key2]) evalMap[key2] = a.id;
+      });
+
+      const personRows = allRows.filter(r=>r.role==='person');
+      if (personRows.length > 0) {
+        const uploadedSabuns = new Set(personRows.map(r=>r.sabun).filter(Boolean));
+        let nextNo = persons.length>0 ? Math.max(...persons.map(p=>p.no))+1 : 1;
+        let deactivated = 0;
+
+        // 엑셀에 없는 기존 인원 → 비활성화
+        persons.forEach(p => {
+          if (p.sabun && !uploadedSabuns.has(p.sabun)) {
+            if (p.active !== false) { p.active = false; deactivated++; }
+          }
+        });
+
+        personRows.forEach(r=>{
+          const evalId = evalMap[r.dept] || evalMap[r.jijum] || '';
+          const existing = persons.find(p=>p.sabun===r.sabun && r.sabun);
+          if (existing) {
+            Object.assign(existing, {
+              name:r.name, company:r.company, bonbu:r.bonbu, jijum:r.jijum,
+              sil:r.sil, team:r.team, jikchek:r.jikchek, jikchekgup:r.jikchekgup,
+              jikgup:r.jikgup, email:r.email, nyeoncha:r.nyeoncha, bigo:r.bigo,
+              evaluatorId: evalId || existing.evaluatorId,
+              active: true, // 재활성화
+            });
+            personUpdated++;
+          } else {
+            persons.push({
+              no: nextNo++, name:r.name, sabun:r.sabun,
+              company:r.company, bonbu:r.bonbu, jijum:r.jijum,
+              sil:r.sil, team:r.team, jikchek:r.jikchek,
+              jikchekgup:r.jikchekgup, jikgup:r.jikgup,
+              email:r.email, nyeoncha:r.nyeoncha, bigo:r.bigo,
+              evaluatorId: evalId,
+              active: true,
+            });
+            if (!evalData[nextNo-1]) evalData[nextNo-1]={g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
+            personAdded++;
+          }
+        });
+
+        if (deactivated > 0)
+          msg2 += `<br>⚠️ ${deactivated}명 비활성화 (엑셀 미포함 → 목록에서 숨김, 데이터 유지)`;
+      }
+
+      save();
+      renderAccountsAdmin();
+
+      let msg = `✅ 계정 — 신규 ${accAdded}개 추가 · ${accUpdated}개 업데이트`;
+      let msg2 = '';
+      if (personRows.length>0)
+        msg += `<br>✅ 직책자 — 신규 ${personAdded}명 추가 · ${personUpdated}명 업데이트` + msg2;
+
+      const unmapped = personRows.filter(r=>!evalMap[r.dept] && !evalMap[r.jijum]);
+      if (unmapped.length)
+        msg += `<br><span style="color:#b7791f">⚠️ 평가자 미매핑: ${unmapped.map(r=>r.name).join(', ')} (소속 일치하는 eval 계정 없음)</span>`;
+      if (skipped.length)
+        msg += `<br><span style="color:#b7791f">⚠️ 건너뜀: ${skipped.join(' / ')}</span>`;
+
+      showAccResult((unmapped.length||skipped.length)?'warn':'ok', msg);
+    } catch(err) { showAccResult('warn','오류: '+err.message); }
+  };
+  reader.readAsBinaryString(file);
+}
+function showAccResult(type, msg) {
+  const el = document.getElementById('upload-result-acc');
+  if (!el) return;
+  el.className = 'upload-result '+(type==='ok'?'upload-ok':'upload-warn');
+  el.innerHTML = msg; el.style.display = 'block';
+}
+
+// ══ 계정 내보내기 ══
+function exportAccountsExcel() {
+  const rows = [['사번','이름','권한','소속','직책']];
+  accounts.forEach(a => {
+    rows.push([a.id, a.name, a.role, a.dept||'', a.position||'']);
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:12},{wch:10},{wch:18},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws, '계정목록');
+  XLSX.writeFile(wb, '계정목록_'+new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')+'.xlsx');
+  showToast('📤 계정 목록 내보내기 완료! (비밀번호 제외)');
+}
+
+
+function handlePwDrop(e){
+  e.preventDefault();
+  document.getElementById('upload-zone-pw').classList.remove('drag');
+  const file=e.dataTransfer.files[0];
+  if(file) parsePwExcel(file);
+}
+function handlePwUpload(e){
+  const file=e.target.files[0];
+  if(file) parsePwExcel(file);
+  e.target.value='';
+}
+function parsePwExcel(file){
+  // 형식: 사번(0) | 비밀번호(1)
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){showPwResult('warn','데이터가 없습니다.');return;}
+      let updated=0, notFound=[];
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        const sabun=String(r[0]||'').trim();
+        const pw=String(r[1]||'').trim();
+        if(!sabun||!pw)continue;
+        const acc=accounts.find(a=>a.id===sabun);
+        if(acc){acc.pw=pw;updated++;}
+        else notFound.push(sabun);
+      }
+      save();
+      renderAccountsAdmin();
+      let msg=`✅ ${updated}개 계정 비밀번호 업데이트 완료`;
+      if(notFound.length) msg+=`<br><span style="color:#b7791f">⚠️ 계정 없음: ${notFound.join(', ')}</span>`;
+      showPwResult(notFound.length?'warn':'ok', msg);
+    }catch(err){showPwResult('warn','오류: '+err.message);}
+  };
+  reader.readAsBinaryString(file);
+}
+function showPwResult(type,msg){
+  const el=document.getElementById('upload-result-pw');
+  if(!el)return;
+  el.className='upload-result '+(type==='ok'?'upload-ok':'upload-warn');
+  el.innerHTML=msg; el.style.display='block';
+}
+
+// ══ UPLOAD RESULT ══
+function showUploadResult(type,msg){
+  const el=document.getElementById('upload-result');
+  if(!el)return;
+  el.className='upload-result '+(type==='ok'?'upload-ok':'upload-warn');
+  el.innerHTML=msg;
+  el.style.display='block';
+}
+
+// ══════════════════════════════════════
+//  HR PAGES (PDF 기반)
+// ══════════════════════════════════════
+
+const PDF_TYPES = [
+  {key:'mbo2024', label:'MBO 2024'},
+  {key:'mbo2025', label:'MBO 2025'},
+  {key:'mbo2026', label:'MBO 2026'},
+  {key:'edu',     label:'교육'},
+  {key:'attend',  label:'근태'},
+  {key:'history', label:'발령이력'},
+];
+
+// 개인 키 생성: 사번 우선 → 이름/성명 폴백 (다양한 컬럼명 지원)
+function hrKey(row) {
+  const sabun = (row['사번']||'').trim();
+  if (sabun) return sabun;
+  return (row['이름']||row['성명']||row['사원명']||row['성명(이름)']||'').trim();
+}
+
+// 이름 추출 헬퍼
+function hrName(row) {
+  return (row['이름']||row['성명']||row['사원명']||row['사번']||'').trim();
+}
+
+// ── 인적사항 목록 페이지 HTML ──
+function buildHrListPage() {
+  return `
+  <div class="page" id="page-hr-list">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">👤 직책자 인적사항 목록</span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <select id="hr-filter-bonbu" class="form-input" style="width:160px;padding:6px 10px" onchange="renderHrList()">
+            <option value="">전체 본부</option>
+          </select>
+          <span style="font-size:11px;color:var(--text-muted)" id="hr-count"></span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="hr-list-wrap"><div class="alert alert-info">인적사항 엑셀 업로드 후 목록이 표시됩니다.</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="page" id="page-hr-detail">
+    <div id="hr-detail-wrap"></div>
+  </div>`;
+}
+
+// ── 업로드 페이지 HTML (관리자용) ──
+function buildHrPages() {
+  return buildHrListPage() + `
+  <div class="page" id="page-hr-upload">
+
+    <!-- STEP 1: 인적사항 엑셀 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📋 STEP 1 · 인적사항 엑셀 업로드</span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-accent btn-sm" onclick="downloadHrTemplate()">📥 양식 다운로드</button>
+          <span style="font-size:11px;color:var(--text-muted)" id="hr-persons-cnt">${hrPersons.length}명 등록됨</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
+          📌 양식을 먼저 다운로드하여 작성 후 업로드하세요.<br>
+          필수 컬럼: <strong>이름</strong> (사번 있으면 함께) · 평가항목 컬럼 포함 · 업로드 후 PDF 슬롯 자동 생성
+        </div>
+        <div class="upload-zone" onclick="document.getElementById('f-hr-persons').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+          ondrop="hrPersonsDrop(event)">
+          <div class="upload-icon">📋</div>
+          <div class="upload-text"><strong>인적사항 엑셀 클릭 또는 드래그</strong><br>.xlsx / .xls</div>
+        </div>
+        <input type="file" id="f-hr-persons" accept=".xlsx,.xls" style="display:none" onchange="hrPersonsUpload(event)">
+        <div class="upload-result" id="r-hr-persons"></div>
+      </div>
+    </div>
+
+    <!-- STEP 2: 인원별 PDF 업로드 슬롯 -->
+    <div id="hr-pdf-slots"></div>
+
+  </div>`;
+}
+
+// ── 인적사항 양식 헤더 정의 ──
+const HR_TEMPLATE_HEADERS = [
+  '구분','이름','본부','지점','실','팀','입사일','근속기간','직급','직책',
+  '현)직책보임일','직책년차','사번','회사메일',
+  // 인사평가
+  '인사평가등급(24년)','인사평가점수(24년)',
+  '인사평가등급(25년)','인사평가점수(25년)',
+  '인사평가등급(26년)','인사평가점수(26년)',
+  // 직책종합평가
+  '직책종합평가등급(25년)',
+  // 직책평가 분기별
+  '직책평가_24년4분기',
+  '직책평가_25년2분기','직책평가_25년3분기','직책평가_25년4분기',
+  '직책평가_26년1분기',
+];
+
+// 평가 컬럼 키 목록
+const EVAL_COL_KEYS = HR_TEMPLATE_HEADERS.slice(14); // 인사평가등급(24년) 부터
+
+// ── 양식 다운로드 ──
+function downloadHrTemplate() {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([HR_TEMPLATE_HEADERS]);
+  // 컬럼 너비 설정
+  ws['!cols'] = HR_TEMPLATE_HEADERS.map((h,i) => ({wch: i < 14 ? 16 : 20}));
+  XLSX.utils.book_append_sheet(wb, ws, '인적사항');
+  XLSX.writeFile(wb, '직책자_인적사항_양식.xlsx');
+  showToast('📥 양식 다운로드 완료! 작성 후 업로드하세요.');
+}
+
+// ── 인적사항 엑셀 업로드 ──
+function hrPersonsDrop(e) {
+  e.preventDefault(); e.currentTarget.classList.remove('drag');
+  const f = e.dataTransfer.files[0]; if(f) hrPersonsParse(f);
+}
+function hrPersonsUpload(e) {
+  const f = e.target.files[0]; if(f) hrPersonsParse(f); e.target.value='';
+}
+function hrPersonsParse(file) {
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (rows.length < 2) { hrSetResult('r-hr-persons','warn','데이터가 없습니다.'); return; }
+      const headers = rows[0].map(h=>String(h).trim());
+      const data = [];
+      for (let i=1;i<rows.length;i++) {
+        const r=rows[i];
+        if (r.every(c=>c==='')) continue;
+        const obj={};
+        headers.forEach((h,j)=>{ obj[h]=String(r[j]||'').trim(); });
+        data.push(obj);
+      }
+      hrPersons = data;
+      localStorage.setItem('hr_persons', JSON.stringify(hrPersons));
+      const evalFound = EVAL_COL_KEYS.filter(k => headers.includes(k)).length;
+      hrSetResult('r-hr-persons','ok',
+        `✅ ${data.length}명 업로드 완료 (컬럼 ${headers.length}개${evalFound?` · 평가항목 ${evalFound}개 인식`:''})`);
+      const el = document.getElementById('hr-persons-cnt');
+      if(el) el.textContent = data.length+'명 등록됨';
+      renderHrPdfSlots();
+    } catch(err) { hrSetResult('r-hr-persons','warn','오류: '+err.message); }
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ── PDF 슬롯 렌더 ──
+function renderHrPdfSlots() {
+  const wrap = document.getElementById('hr-pdf-slots');
+  if (!wrap) return;
+  if (!hrPersons.length) { wrap.innerHTML=''; return; }
+
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📂 STEP 2 · 인원별 PDF 업로드</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:auto">각 인원의 항목별 PDF를 업로드하세요</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr>
+              <th style="background:#f0f3f8;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);width:140px">이름 (사번)</th>
+              ${PDF_TYPES.map(t=>`<th style="background:#f0f3f8;padding:10px 8px;text-align:center;border-bottom:1px solid var(--border)">${t.label}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${hrPersons.map((p,i) => {
+              const key = hrKey(p);
+              const name = hrName(p) || key;
+              const sabun = p['사번']||'';
+              const pdfs = hrPdfs[key]||{};
+              return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:10px 14px;font-weight:700">${name}${sabun?`<br><span style="font-size:10px;color:var(--text-muted);font-weight:400">${sabun}</span>`:''}</td>
+                ${PDF_TYPES.map(t => {
+                  const has = !!(pdfs[t.key]);
+                  return `<td style="text-align:center;padding:6px 4px">
+                    <label style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:3px">
+                      <input type="file" accept=".pdf" style="display:none"
+                        onchange="hrPdfUpload(event,'${encodeURIComponent(key)}','${t.key}',this.closest('td'))">
+                      <span style="font-size:18px">${has?'✅':'📄'}</span>
+                      <span style="font-size:10px;color:${has?'var(--success)':'var(--text-muted)'}">${has?'등록됨':'업로드'}</span>
+                    </label>
+                    ${has?`<br><button onclick="hrPdfDelete('${encodeURIComponent(key)}','${t.key}',this.closest('td'))"
+                      style="font-size:10px;background:none;border:none;color:var(--danger);cursor:pointer;margin-top:2px">삭제</button>`:''}
+                  </td>`;
+                }).join('')}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── PDF 업로드 ──
+// ── PDF 업로드 (Firebase Storage) ──
+function hrPdfUpload(e, encKey, pdfType, tdEl) {
+  const key  = decodeURIComponent(encKey);
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // 업로드 중 표시
+  tdEl.innerHTML = `<div style="text-align:center;font-size:11px;color:var(--text-muted)">⏳ 업로드 중...</div>`;
+
+  const path = `pdfs/${key}/${pdfType}.pdf`;
+  const ref  = storage.ref(path);
+
+  ref.put(file).then(async () => {
+    const url = await ref.getDownloadURL();
+    if (!hrPdfs[key]) hrPdfs[key] = {};
+    hrPdfs[key][pdfType] = url;
+    // Firestore에도 URL 저장
+    await db.collection('hrPdfs').doc(key).set(hrPdfs[key], {merge:true});
+    localStorage.setItem('hr_pdfs', JSON.stringify(hrPdfs));
+    tdEl.innerHTML = `
+      <label style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:3px">
+        <input type="file" accept=".pdf" style="display:none"
+          onchange="hrPdfUpload(event,'${encodeURIComponent(key)}','${pdfType}',this.closest('td'))">
+        <span style="font-size:18px">✅</span>
+        <span style="font-size:10px;color:var(--success)">등록됨</span>
+      </label>
+      <br><button onclick="hrPdfDelete('${encodeURIComponent(key)}','${pdfType}',this.closest('td'))"
+        style="font-size:10px;background:none;border:none;color:var(--danger);cursor:pointer;margin-top:2px">삭제</button>`;
+    showToast(`✅ ${PDF_TYPES.find(t=>t.key===pdfType)?.label} PDF 업로드 완료`);
+  }).catch(err => {
+    tdEl.innerHTML = `<span style="font-size:10px;color:var(--danger)">❌ 실패</span>`;
+    showToast('업로드 실패: ' + err.message);
+  });
+  e.target.value='';
+}
+
+// ── PDF 삭제 ──
+async function hrPdfDelete(encKey, pdfType, tdEl) {
+  if (!confirm('이 PDF를 삭제하시겠습니까?')) return;
+  const key  = decodeURIComponent(encKey);
+  try {
+    await storage.ref(`pdfs/${key}/${pdfType}.pdf`).delete();
+  } catch(e) { console.warn('Storage 삭제 실패:', e); }
+  if (hrPdfs[key]) { delete hrPdfs[key][pdfType]; }
+  await db.collection('hrPdfs').doc(key).set(hrPdfs[key]||{});
+  localStorage.setItem('hr_pdfs', JSON.stringify(hrPdfs));
+  tdEl.innerHTML = `
+    <label style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:3px">
+      <input type="file" accept=".pdf" style="display:none"
+        onchange="hrPdfUpload(event,'${encodeURIComponent(key)}','${pdfType}',this.closest('td'))">
+      <span style="font-size:18px">📄</span>
+      <span style="font-size:10px;color:var(--text-muted)">업로드</span>
+    </label>`;
+  showToast('삭제되었습니다.');
+}
+
+function renderHrUpload() {
+  const el = document.getElementById('hr-persons-cnt');
+  if(el) el.textContent = hrPersons.length+'명 등록됨';
+  renderHrPdfSlots();
+}
+
+// 엑셀 날짜 숫자 → 날짜 문자열 변환
+function excelDateToStr(val) {
+  if (!val || val === '-') return val;
+  const num = Number(val);
+  if (!isNaN(num) && num > 40000 && num < 60000) {
+    const date = new Date(Math.round((num - 25569) * 86400 * 1000));
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth()+1).padStart(2,'0');
+    const d = String(date.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  return val;
+}
+
+// 관리자용 인적사항 목록 고정 컬럼 순서
+const HR_ADMIN_LIST_COLS = [
+  {key:'이름',           label:'이름'},
+  {key:'사번',           label:'사번'},
+  {key:'본부',           label:'본부'},
+  {key:'지점',           label:'지점'},
+  {key:'실',             label:'실'},
+  {key:'팀',             label:'팀'},
+  {key:'직급',           label:'직급'},
+  {key:'직책',           label:'직책'},
+  {key:'현)직책보임일',  label:'현직책보임일'},
+  {key:'직책년차',       label:'직책년차'},
+  {key:'입사일',         label:'입사일'},
+  {key:'근속기간',       label:'근속기간'},
+  {key:'인사평가등급(24년)',  label:'인사평가등급(24년)'},
+  {key:'인사평가점수(24년)',  label:'인사평가점수(24년)'},
+  {key:'인사평가등급(25년)',  label:'인사평가등급(25년)'},
+  {key:'인사평가점수(25년)',  label:'인사평가점수(25년)'},
+  {key:'인사평가등급(26년)',  label:'인사평가등급(26년)'},
+  {key:'인사평가점수(26년)',  label:'인사평가점수(26년)'},
+  {key:'직책종합평가등급(25년)', label:'직책종합평가등급(25년)'},
+  {key:'직책평가_24년4분기',    label:'직책평가_24년4분기'},
+  {key:'직책평가_25년2분기',    label:'직책평가_25년2분기'},
+  {key:'직책평가_25년3분기',    label:'직책평가_25년3분기'},
+  {key:'직책평가_25년4분기',    label:'직책평가_25년4분기'},
+  {key:'직책평가_26년1분기',    label:'직책평가_26년1분기'},
+];
+const HR_LIST_COLS = [
+  {key:'이름', label:'이름'},
+  {key:'지점', label:'소속'},
+  {key:'실',   label:'실'},
+  {key:'팀',   label:'팀'},
+  {key:'입사일', label:'입사일'},
+  {key:'근속기간', label:'근속기간'},
+  {key:'직급', label:'직급'},
+  {key:'직책', label:'직책'},
+  {key:'현)직책보임일', label:'현직책보임일'},
+  {key:'직책년차', label:'직책년차'},
+  {key:'인사평가등급(25년)', label:'25년 인사평가등급'},
+  {key:'직책종합평가등급(25년)', label:'25년 직책종합평가등급'},
+];
+
+// 개인 상세 기본정보에 표시할 컬럼
+// 개인 상세 기본정보 레이아웃 (3줄 × 4열 고정)
+const HR_DETAIL_ROWS = [
+  [ {key:'이름', label:'이름'}, {key:'지점', label:'소속'}, {key:'실', label:'실'}, {key:'팀', label:'팀'} ],
+  [ {key:'직급', label:'직급'}, {key:'입사일', label:'입사일'}, {key:'근속기간', label:'근속기간'}, {key:'', label:''} ],
+  [ {key:'직책', label:'직책'}, {key:'현)직책보임일', label:'현직책보임일'}, {key:'직책년차', label:'직책년차'}, {key:'', label:''} ],
+];
+const HR_DETAIL_COLS = HR_DETAIL_ROWS.flat().map(c=>c.key).filter(Boolean);
+
+// ── HR 목록 렌더 ──
+function renderHrList() {
+  const wrap = document.getElementById('hr-list-wrap');
+  if (!wrap) return;
+
+  const sel = document.getElementById('hr-filter-bonbu');
+  function getBonbu(p) { return (p['본부']||p['본부명']||'').trim(); }
+
+  if (sel) {
+    const bonbus = [...new Set(hrPersons.map(p=>getBonbu(p)).filter(Boolean))];
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">전체 본부</option>' + bonbus.map(b=>`<option value="${b}"${b===cur?' selected':''}>${b}</option>`).join('');
+  }
+
+  let data = [...hrPersons];
+
+  // 평가자: hrView 있으면 전체, 없으면 본인 담당 지점만
+  if (currentUser.role === 'eval') {
+    if (!currentUser.hrView) {
+      const myNames  = getMyPersons().map(p=>p.name);
+      const myBonbus = [...new Set(getMyPersons().map(p=>p.bonbu).filter(Boolean))];
+      data = data.filter(p => myBonbus.includes(getBonbu(p)) || myNames.includes(hrName(p)));
+    }
+    // hrView=true 면 전체 표시 (필터 없음)
+  }
+
+  const filterBonbu = sel ? sel.value : '';
+  if (filterBonbu) data = data.filter(p=>getBonbu(p)===filterBonbu);
+
+  const cntEl = document.getElementById('hr-count');
+  if(cntEl) cntEl.textContent = data.length+'명';
+
+  if (!data.length) {
+    wrap.innerHTML = '<div class="alert alert-info">업로드된 인적사항 데이터가 없거나 조건에 맞는 인원이 없습니다.</div>';
+    return;
+  }
+
+  // 관리자는 고정 순서 컬럼, 평가자/부서장은 HR_LIST_COLS
+  const isAdmin = currentUser.role === 'admin';
+  const cols = isAdmin ? HR_ADMIN_LIST_COLS : HR_LIST_COLS;
+
+  wrap.innerHTML = `
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>순번</th>
+        ${cols.map(c=>`<th>${c.label}</th>`).join('')}
+        <th style="background:#e8b84b;color:#1a3a5c">상세보기</th>
+      </tr></thead>
+      <tbody>
+        ${data.map((row,i)=>`<tr>
+          <td style="font-size:12px;text-align:center">${i+1}</td>
+          ${cols.map(c=>{
+            let v = row[c.key]||'-';
+            // 날짜 숫자 변환
+            if (c.key==='현)직책보임일'||c.key==='입사일') v = excelDateToStr(v);
+            return `<td style="white-space:nowrap;font-size:12px">${v}</td>`;
+          }).join('')}
+          <td style="text-align:center">
+            <button class="btn btn-primary btn-sm"
+              onclick="showHrDetail('${encodeURIComponent(row['사번']||'')}','${encodeURIComponent(row['이름']||row['성명']||row['사원명']||'')}')">
+              상세보기</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ── HR 개인 상세 카드 ──
+function showHrDetail(encSabun, encName) {
+  const sabun = decodeURIComponent(encSabun);
+  const name  = decodeURIComponent(encName);
+  const key   = sabun || name;
+  const isAdmin = currentUser.role === 'admin';
+
+  function matchRow(p) {
+    if (sabun && (p['사번']||'').trim() === sabun) return true;
+    return hrName(p) === name;
+  }
+  const info  = hrPersons.find(matchRow) || null;
+  const pdfs  = hrPdfs[key]  || {};
+  const extra = hrExtra[key] || {photo:'', edu:[], attend:{months:[]}, history:[]};
+
+  // 부서장/평가자에게 숨길 컬럼
+  const HIDDEN_FOR_EVAL = ['순번','구분','직책급','사번','회사메일','평가자','비고','담당평가자'];
+
+  // ── 인적사항 그리드 ──
+  function infoGrid(row) {
+    if (!row) return '<div class="alert alert-warning">인적사항 데이터가 없습니다.</div>';
+    const entries = Object.entries(row).filter(([k]) =>
+      isAdmin ? true : !HIDDEN_FOR_EVAL.includes(k.trim())
+    );
+    return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+      ${entries.map(([k,v])=>`
+        <div style="background:var(--bg);border-radius:7px;padding:10px 12px">
+          <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">${k}</div>
+          <div style="font-size:12px;font-weight:600">${v||'-'}</div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  // ── PDF 뷰어 ──
+  function pdfViewer(b64, label) {
+    if (!b64) return `<div style="text-align:center;padding:40px;color:var(--text-muted)">
+      <div style="font-size:36px;margin-bottom:10px">📄</div>
+      <div style="font-size:13px">${label} PDF가 아직 업로드되지 않았습니다.</div>
+    </div>`;
+    return `<iframe src="${b64}" style="width:100%;height:720px;border:none;border-radius:8px"></iframe>`;
+  }
+
+  // 사진 크기: 관리자 110×140, 평가자 150×190
+  const photoW = isAdmin ? '110px' : '150px';
+  const photoH = isAdmin ? '140px' : '190px';
+  const eduRows = extra.edu || [];
+  function eduTable() {
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:13px;font-weight:700;color:var(--primary)">교육 이력</span>
+      ${isAdmin?`<button class="btn btn-primary btn-sm" onclick="addEduRow('${key}')">+ 행 추가</button>`:''}
+    </div>
+    ${isAdmin?`
+    <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
+      📂 엑셀 업로드: <strong>교육명 | 교육기관 | 시작일 | 종료일 | 교육시간 | 이수여부</strong> 형식
+      <label style="margin-left:10px;cursor:pointer;color:var(--primary-light);font-weight:600">
+        📥 엑셀 선택
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="eduExcelUpload(event,'${key}')">
+      </label>
+    </div>`:''}
+    <div class="tbl-wrap" id="edu-table-${key.replace(/[^a-zA-Z0-9]/g,'_')}">
+      <table>
+        <thead><tr>
+          <th>교육명</th><th>교육기관</th><th>시작일</th><th>종료일</th><th>교육시간</th><th>이수여부</th>
+          ${isAdmin?'<th>삭제</th>':''}
+        </tr></thead>
+        <tbody id="edu-tbody-${key.replace(/[^a-zA-Z0-9]/g,'_')}">
+          ${eduRows.length ? eduRows.map((r,i)=>`<tr>
+            ${isAdmin ? `
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px" value="${r.name||''}" onchange="editEdu('${key}',${i},'name',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px" value="${r.org||''}" onchange="editEdu('${key}',${i},'org',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="${r.start||''}" onchange="editEdu('${key}',${i},'start',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="${r.end||''}" onchange="editEdu('${key}',${i},'end',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="${r.hours||''}" onchange="editEdu('${key}',${i},'hours',this.value)"></td>
+              <td><select class="grade-sel" style="width:80px" onchange="editEdu('${key}',${i},'done',this.value)">
+                <option value="이수"${r.done==='이수'?' selected':''}>이수</option>
+                <option value="미이수"${r.done==='미이수'?' selected':''}>미이수</option>
+              </select></td>
+              <td><button class="btn btn-danger btn-sm" onclick="deleteEdu('${key}',${i})">삭제</button></td>
+            ` : `
+              <td style="font-size:12px">${r.name||'-'}</td>
+              <td style="font-size:12px">${r.org||'-'}</td>
+              <td style="font-size:12px">${r.start||'-'}</td>
+              <td style="font-size:12px">${r.end||'-'}</td>
+              <td style="font-size:12px">${r.hours||'-'}</td>
+              <td><span style="color:${r.done==='이수'?'var(--success)':'var(--danger)'};font-weight:700">${r.done||'-'}</span></td>
+            `}
+          </tr>`).join('') : `<tr><td colspan="${isAdmin?7:6}" style="text-align:center;color:var(--text-muted);padding:20px">교육 이력이 없습니다.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  // ── 근태 (월별) ──
+  const attendMonths = (extra.attend && extra.attend.months) ? extra.attend.months : [];
+  const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  function attendTable() {
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:13px;font-weight:700;color:var(--primary)">근태 현황 (월별)</span>
+    </div>
+    ${isAdmin?`
+    <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
+      📂 엑셀 업로드: <strong>월 | 지각 | 결근 | 조퇴</strong> 형식 (월은 1~12 숫자)
+      <label style="margin-left:10px;cursor:pointer;color:var(--primary-light);font-weight:600">
+        📥 엑셀 선택
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="attendExcelUpload(event,'${key}')">
+      </label>
+    </div>`:''}
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>월</th><th>지각</th><th>결근</th><th>조퇴</th>
+        </tr></thead>
+        <tbody>
+          ${MONTHS.map((m,i)=>{
+            const mo = attendMonths.find(a=>String(a.month)===String(i+1)) || {month:i+1,late:0,absent:0,leave:0};
+            return `<tr>
+              <td style="font-weight:700">${m}</td>
+              ${isAdmin?`
+                <td><input class="form-input" style="font-size:12px;padding:4px 6px;width:60px;text-align:center" type="number" min="0" value="${mo.late||0}" onchange="editAttend('${key}',${i+1},'late',this.value)"></td>
+                <td><input class="form-input" style="font-size:12px;padding:4px 6px;width:60px;text-align:center" type="number" min="0" value="${mo.absent||0}" onchange="editAttend('${key}',${i+1},'absent',this.value)"></td>
+                <td><input class="form-input" style="font-size:12px;padding:4px 6px;width:60px;text-align:center" type="number" min="0" value="${mo.leave||0}" onchange="editAttend('${key}',${i+1},'leave',this.value)"></td>
+              `:`
+                <td style="font-size:12px;color:${mo.late>0?'#c62828':'inherit'};font-weight:${mo.late>0?'700':'400'}">${mo.late||0}</td>
+                <td style="font-size:12px;color:${mo.absent>0?'#c62828':'inherit'};font-weight:${mo.absent>0?'700':'400'}">${mo.absent||0}</td>
+                <td style="font-size:12px;color:${mo.leave>0?'#f57f17':'inherit'};font-weight:${mo.leave>0?'700':'400'}">${mo.leave||0}</td>
+              `}
+            </tr>`;
+          }).join('')}
+          <tr style="background:#f0f3f8;font-weight:700">
+            <td>합계</td>
+            <td>${attendMonths.reduce((s,a)=>s+(Number(a.late)||0),0)}</td>
+            <td>${attendMonths.reduce((s,a)=>s+(Number(a.absent)||0),0)}</td>
+            <td>${attendMonths.reduce((s,a)=>s+(Number(a.leave)||0),0)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  // ── 발령이력 ──
+  const historyRows = extra.history || [];
+  function historyTable() {
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:13px;font-weight:700;color:var(--primary)">발령 이력</span>
+      ${isAdmin?`<button class="btn btn-primary btn-sm" onclick="addHistoryRow('${key}')">+ 행 추가</button>`:''}
+    </div>
+    ${isAdmin?`
+    <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
+      📂 엑셀 업로드: <strong>발령일자 | 전직책 | 전직급 | 전부서 | 후직책 | 후직급 | 후부서 | 비고</strong>
+      <label style="margin-left:10px;cursor:pointer;color:var(--primary-light);font-weight:600">
+        📥 엑셀 선택
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="historyExcelUpload(event,'${key}')">
+      </label>
+    </div>`:''}
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>발령일자</th><th>전 직책</th><th>전 직급</th><th>전 부서</th>
+          <th>후 직책</th><th>후 직급</th><th>후 부서</th><th>비고</th>
+          ${isAdmin?'<th>삭제</th>':''}
+        </tr></thead>
+        <tbody id="history-tbody-${key.replace(/[^a-zA-Z0-9]/g,'_')}">
+          ${historyRows.length ? historyRows.map((r,i)=>`<tr>
+            ${isAdmin?`
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="${r.date||''}" onchange="editHistory('${key}',${i},'date',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="${r.bJikchek||''}" onchange="editHistory('${key}',${i},'bJikchek',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="${r.bJikgup||''}" onchange="editHistory('${key}',${i},'bJikgup',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="${r.bDept||''}" onchange="editHistory('${key}',${i},'bDept',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="${r.aJikchek||''}" onchange="editHistory('${key}',${i},'aJikchek',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="${r.aJikgup||''}" onchange="editHistory('${key}',${i},'aJikgup',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="${r.aDept||''}" onchange="editHistory('${key}',${i},'aDept',this.value)"></td>
+              <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="${r.note||''}" onchange="editHistory('${key}',${i},'note',this.value)"></td>
+              <td><button class="btn btn-danger btn-sm" onclick="deleteHistory('${key}',${i})">삭제</button></td>
+            `:`
+              <td style="font-size:12px">${r.date||'-'}</td>
+              <td style="font-size:12px">${r.bJikchek||'-'}</td><td style="font-size:12px">${r.bJikgup||'-'}</td><td style="font-size:12px">${r.bDept||'-'}</td>
+              <td style="font-size:12px">${r.aJikchek||'-'}</td><td style="font-size:12px">${r.aJikgup||'-'}</td><td style="font-size:12px">${r.aDept||'-'}</td>
+              <td style="font-size:12px">${r.note||'-'}</td>
+            `}
+          </tr>`).join('') : `<tr><td colspan="${isAdmin?9:8}" style="text-align:center;color:var(--text-muted);padding:20px">발령 이력이 없습니다.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  // ── 기본정보 탭 ──
+  function basicInfoContent() {
+    const safeKey = key.replace(/[^a-zA-Z0-9]/g,'_');
+
+    // 인적사항 그리드 (역할별 컬럼 제한 + 날짜 변환)
+    function infoGridFull(row) {
+      if (!row) return '<div class="alert alert-warning">인적사항 데이터가 없습니다.</div>';
+      const DATE_COLS = ['현)직책보임일','입사일'];
+
+      if (!isAdmin) {
+        // 평가자/직책자: 3줄 × 4열 고정 레이아웃
+        return HR_DETAIL_ROWS.map(rowCols => `
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+            ${rowCols.map(({key, label}) => {
+              if (!key) return `<div></div>`; // 빈 칸
+              let v = row[key]||'-';
+              if (DATE_COLS.includes(key)) v = excelDateToStr(v);
+              return `<div style="background:var(--bg);border-radius:7px;padding:10px 12px">
+                <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">${label}</div>
+                <div style="font-size:12px;font-weight:600;word-break:break-all">${v}</div>
+              </div>`;
+            }).join('')}
+          </div>`).join('');
+      } else {
+        // 관리자: 평가컬럼 제외 전체 표시
+        const EVAL_COL_SET = new Set(EVAL_COL_KEYS);
+        const entries = Object.entries(row).filter(([k])=>!EVAL_COL_SET.has(k));
+        return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+          ${entries.map(([k,v])=>{
+            let disp = v||'-';
+            if (DATE_COLS.includes(k)) disp = excelDateToStr(disp);
+            return `<div style="background:var(--bg);border-radius:7px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">${k}</div>
+              <div style="font-size:12px;font-weight:600;word-break:break-all">${disp}</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
+    }
+
+    // MBO 버튼 (클릭 → 새 창 모달)
+    const mboButtons = PDF_TYPES.filter(t=>t.key.startsWith('mbo')).map(t=>{
+      const has = !!(pdfs[t.key]);
+      return `<button onclick="openMboModal('${key}','${t.key}','${t.label}')"
+        style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;
+        border:2px solid ${has?'var(--primary-light)':'var(--border)'};
+        background:${has?'#eef4fb':'var(--bg)'};color:${has?'var(--primary)':'var(--text-muted)'};
+        font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s"
+        ${has?'':`title="${t.label} PDF가 업로드되지 않았습니다"`}>
+        ${has?'📄':'📭'} ${t.label}
+        ${has?'<span style="font-size:10px;color:var(--success)">● 등록됨</span>':'<span style="font-size:10px">미등록</span>'}
+      </button>`;
+    }).join('');
+
+    return `
+    <!-- 사진 + 인적사항 -->
+    <div style="display:flex;gap:20px;margin-bottom:20px;align-items:flex-start">
+      <div style="flex-shrink:0;text-align:center">
+        <div id="photo-box-${safeKey}" style="width:${photoW};height:${photoH};border:2px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg);display:flex;align-items:center;justify-content:center;margin-bottom:8px">
+          ${extra.photo?`<img src="${extra.photo}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:40px">👤</span>`}
+        </div>
+        ${isAdmin?`
+        <label style="cursor:pointer;font-size:11px;color:var(--primary-light);font-weight:600">
+          📷 사진 업로드
+          <input type="file" accept="image/*" style="display:none" onchange="uploadPhoto(event,'${key}')">
+        </label>
+        ${extra.photo?`<br><button onclick="deletePhoto('${key}')" style="font-size:10px;background:none;border:none;color:var(--danger);cursor:pointer;margin-top:4px">삭제</button>`:''}
+        `:''}
+      </div>
+      <div style="flex:1">${infoGridFull(info)}</div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+    <!-- 평가항목 -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:12px">📈 평가 항목</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+        <!-- 인사평가 -->
+        <div style="background:var(--bg);border-radius:10px;padding:14px">
+          <div style="font-size:12px;font-weight:700;color:var(--primary-light);margin-bottom:10px">인사평가</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr>
+              <th style="background:#e8f0fe;padding:7px 10px;border:1px solid var(--border);text-align:center">연도</th>
+              <th style="background:#e8f0fe;padding:7px 10px;border:1px solid var(--border);text-align:center">등급</th>
+              <th style="background:#e8f0fe;padding:7px 10px;border:1px solid var(--border);text-align:center">점수</th>
+            </tr></thead>
+            <tbody>
+              ${['24년','25년','26년'].map(yr=>{
+                const g = info ? (info[`인사평가등급(${yr})`]||'-') : '-';
+                const s = info ? (info[`인사평가점수(${yr})`]||'-') : '-';
+                const isThis = yr==='26년';
+                return `<tr style="${isThis?'opacity:0.55':''}">
+                  <td style="padding:7px 10px;border:1px solid var(--border);text-align:center;font-weight:700">${yr}</td>
+                  <td style="padding:7px 10px;border:1px solid var(--border);text-align:center;font-weight:700;color:${g==='S'?'#c62828':g==='A'?'#1565c0':g==='B'?'#2e7d32':'var(--text)'}">${g}</td>
+                  <td style="padding:7px 10px;border:1px solid var(--border);text-align:center">${isThis&&s==='-'?'<span style="font-size:10px;color:var(--text-muted)">진행 중</span>':s}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          <!-- 직책종합평가등급 -->
+          <div style="margin-top:10px;padding:10px 12px;background:var(--surface);border-radius:7px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;color:var(--text-muted);font-weight:700">25년 직책종합평가등급</span>
+            <span style="font-size:15px;font-weight:800;color:${(()=>{const g=info?(info['직책종합평가등급(25년)']||'-'):'-';return g==='S'?'#c62828':g==='A'?'#1565c0':g==='B'?'#2e7d32':'var(--text)'})()}">
+              ${info?(info['직책종합평가등급(25년)']||'-'):'-'}
+            </span>
+          </div>
+        </div>
+
+        <!-- 직책평가 -->
+        <div style="background:var(--bg);border-radius:10px;padding:14px">
+          <div style="font-size:12px;font-weight:700;color:var(--primary-light);margin-bottom:10px">직책평가</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr>
+              <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">연도</th>
+              <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">1분기</th>
+              <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">2분기</th>
+              <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">3분기</th>
+              <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">4분기</th>
+            </tr></thead>
+            <tbody>
+              <!-- 24년: 1~3분기 병합 "연 1회 시행(4분기)" -->
+              <tr>
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700">24년</td>
+                <td colspan="3" style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-size:10px;color:var(--text-muted);background:#f8f9fc">연 1회 시행 (4분기)</td>
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700;color:var(--primary)">
+                  ${info?(info['직책평가_24년4분기']||'-'):'-'}
+                </td>
+              </tr>
+              <!-- 25년: 1분기 미시행 -->
+              <tr>
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700">25년</td>
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-size:10px;color:var(--text-muted);background:#f8f9fc">미시행</td>
+                ${['25년2분기','25년3분기','25년4분기'].map(q=>{
+                  const v = info?(info[`직책평가_${q}`]||'-'):'-';
+                  return `<td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700;color:var(--primary)">${v}</td>`;
+                }).join('')}
+              </tr>
+              <!-- 26년: 1분기만, 나머지 진행 예정 -->
+              <tr>
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700">26년</td>
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700;color:var(--primary)">
+                  ${info?(info['직책평가_26년1분기']||'-'):'-'}
+                </td>
+                ${[2,3,4].map(q=>`
+                  <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-size:10px;color:var(--text-muted);background:#f8f9fc">예정</td>
+                `).join('')}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+    <!-- MBO -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px">📊 MBO (연도별 클릭 시 전체 화면으로 열림)</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${mboButtons}</div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+    <!-- 교육 이력 -->
+    <div style="margin-bottom:20px">${eduTable()}</div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+    <!-- 근태 (아코디언) -->
+    <div style="margin-bottom:20px">
+      <div onclick="toggleAttend('${safeKey}')"
+        style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;
+        padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:700;color:var(--primary)">🕐 근태 현황 (월별)</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:11px;color:var(--text-muted)">
+            지각 ${attendMonths.reduce((s,a)=>s+(Number(a.late)||0),0)}회 &nbsp;
+            결근 ${attendMonths.reduce((s,a)=>s+(Number(a.absent)||0),0)}회 &nbsp;
+            조퇴 ${attendMonths.reduce((s,a)=>s+(Number(a.leave)||0),0)}회
+          </span>
+          <span id="attend-arrow-${safeKey}" style="font-size:13px;transition:transform .2s">▼</span>
+        </div>
+      </div>
+      <div id="attend-body-${safeKey}" style="display:none;margin-top:8px">${attendTable()}</div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+    <!-- 발령이력 -->
+    <div>${historyTable()}</div>
+
+    ${isAdmin?`<div style="margin-top:16px;text-align:right">
+      <button class="btn btn-success btn-sm" onclick="saveHrExtra('${key}')">💾 저장</button>
+    </div>`:''}`;
+  }
+
+  // 탭은 기본정보만 (MBO는 모달로)
+  const wrap = document.getElementById('hr-detail-wrap');
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <button class="btn btn-outline btn-sm" onclick="showPage('hr-list')">← 목록으로</button>
+      <span style="font-size:17px;font-weight:800;color:var(--primary)">${name}</span>
+      ${sabun?`<span class="badge badge-blue">사번: ${sabun}</span>`:''}
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px">
+      ${basicInfoContent()}
+    </div>
+
+    <!-- MBO 모달 -->
+    <div id="mbo-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:400;align-items:center;justify-content:center">
+      <div style="background:#fff;border-radius:12px;width:92vw;height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)">
+          <span id="mbo-modal-title" style="font-size:15px;font-weight:700;color:var(--primary)"></span>
+          <button onclick="closeMboModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1">✕</button>
+        </div>
+        <div style="flex:1;overflow:hidden">
+          <iframe id="mbo-modal-frame" style="width:100%;height:100%;border:none"></iframe>
+          <div id="mbo-modal-empty" style="display:none;text-align:center;padding:60px;color:var(--text-muted)">
+            <div style="font-size:48px;margin-bottom:16px">📭</div>
+            <div style="font-size:14px">PDF가 아직 업로드되지 않았습니다.</div>
+            ${isAdmin?`<div style="font-size:12px;margin-top:8px">인사 데이터 업로드 페이지에서 업로드해 주세요.</div>`:''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  showPage('hr-detail');
+}
+
+function switchHrTab(idx, total) {
+  if (!total) total = 1 + PDF_TYPES.length;
+  for (let i=0;i<total;i++) {
+    const tab  = document.getElementById('hr-tab-'+i);
+    const cont = document.getElementById('hr-tab-content-'+i);
+    if (!tab||!cont) continue;
+    tab.style.color = i===idx ? 'var(--primary)' : 'var(--text-muted)';
+    tab.style.borderBottomColor = i===idx ? 'var(--accent)' : 'transparent';
+    cont.style.display = i===idx ? 'block' : 'none';
+  }
+}
+
+// ── 사진 (Firebase Storage + 자동 압축) ──
+function uploadPhoto(e, key) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = async () => {
+      const MAX_W=300, MAX_H=400;
+      let w=img.width, h=img.height;
+      if (w>MAX_W||h>MAX_H) { const r=Math.min(MAX_W/w,MAX_H/h); w=Math.round(w*r); h=Math.round(h*r); }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const compressed=canvas.toDataURL('image/jpeg',0.75);
+      const kb=Math.round(compressed.length*0.75/1024);
+
+      // base64 → Blob → Storage 업로드
+      const res   = await fetch(compressed);
+      const blob  = await res.blob();
+      const path  = `photos/${key}/photo.jpg`;
+      const ref   = storage.ref(path);
+
+      const photoBox = document.getElementById('photo-box-'+key.replace(/[^a-zA-Z0-9]/g,'_'));
+      if (photoBox) photoBox.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px">⏳ 업로드 중...</div>`;
+
+      ref.put(blob, {contentType:'image/jpeg'}).then(async () => {
+        const url = await ref.getDownloadURL();
+        if (!hrExtra[key]) hrExtra[key]={photo:'',edu:[],attend:{months:[]},history:[]};
+        hrExtra[key].photo = url;
+        await db.collection('hrExtra').doc(key).set({photo:url},{merge:true});
+        localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+        if (photoBox) photoBox.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+        showToast(`✅ 사진 저장 완료 (${w}×${h}px, 약 ${kb}KB)`);
+      }).catch(err => {
+        if (photoBox) photoBox.innerHTML = `<span style="font-size:40px">👤</span>`;
+        showToast('사진 업로드 실패: '+err.message);
+      });
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+
+async function deletePhoto(key) {
+  if (!confirm('사진을 삭제하시겠습니까?')) return;
+  try { await storage.ref(`photos/${key}/photo.jpg`).delete(); } catch(e) {}
+  if (hrExtra[key]) hrExtra[key].photo = '';
+  await db.collection('hrExtra').doc(key).set({photo:''},{merge:true});
+  localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+  const photoBox = document.getElementById('photo-box-'+key.replace(/[^a-zA-Z0-9]/g,'_'));
+  if (photoBox) photoBox.innerHTML = `<span style="font-size:40px">👤</span>`;
+  showToast('사진이 삭제되었습니다.');
+}
+
+// ── hrExtra 저장 ──
+async function saveHrExtra(key) {
+  localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+  try {
+    const ex = hrExtra[key] || {};
+    // photo는 이미 Storage URL이므로 그대로 저장
+    await db.collection('hrExtra').doc(key).set(ex, {merge:true});
+    showToast('💾 저장 완료!');
+  } catch(err) {
+    showToast('⚠️ 온라인 저장 실패. 로컬에만 저장됨.');
+  }
+}
+function getExtra(key) {
+  if (!hrExtra[key]) hrExtra[key] = {photo:'',edu:[],attend:{months:[]},history:[]};
+  return hrExtra[key];
+}
+
+// ── 교육 ──
+function editEdu(key, idx, field, val) {
+  const ex = getExtra(key);
+  if (!ex.edu[idx]) ex.edu[idx] = {};
+  ex.edu[idx][field] = val;
+}
+function addEduRow(key) {
+  const ex = getExtra(key);
+  ex.edu.push({name:'',org:'',start:'',end:'',hours:'',done:'이수'});
+  localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+  // 테이블에 행 추가
+  const safeKey = key.replace(/[^a-zA-Z0-9]/g,'_');
+  const tb = document.getElementById('edu-tbody-'+safeKey);
+  if (!tb) return;
+  const i = ex.edu.length - 1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px" value="" onchange="editEdu('${key}',${i},'name',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px" value="" onchange="editEdu('${key}',${i},'org',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="" onchange="editEdu('${key}',${i},'start',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="" onchange="editEdu('${key}',${i},'end',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="" onchange="editEdu('${key}',${i},'hours',this.value)"></td>
+    <td><select class="grade-sel" style="width:80px" onchange="editEdu('${key}',${i},'done',this.value)">
+      <option value="이수">이수</option><option value="미이수">미이수</option>
+    </select></td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteEdu('${key}',${i})">삭제</button></td>`;
+  tb.appendChild(tr);
+}
+function deleteEdu(key, idx) {
+  const ex = getExtra(key);
+  ex.edu.splice(idx, 1);
+  localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+  showToast('삭제됨. 저장 버튼을 눌러주세요.');
+  const safeKey = key.replace(/[^a-zA-Z0-9]/g,'_');
+  const tb = document.getElementById('edu-tbody-'+safeKey);
+  if (tb) { const rows = tb.querySelectorAll('tr'); if (rows[idx]) rows[idx].remove(); }
+}
+function eduExcelUpload(e, key) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (rows.length < 2) { showToast('데이터가 없습니다.'); return; }
+      const headers = rows[0].map(h=>String(h).trim());
+      const ex = getExtra(key);
+      for (let i=1;i<rows.length;i++) {
+        const r=rows[i]; if(r.every(c=>c===''))continue;
+        const obj={};headers.forEach((h,j)=>{obj[h]=String(r[j]||'').trim();});
+        ex.edu.push({
+          name: obj['교육명']||obj[headers[0]]||'',
+          org:  obj['교육기관']||obj[headers[1]]||'',
+          start:obj['시작일']||obj['교육기간']||obj[headers[2]]||'',
+          end:  obj['종료일']||obj[headers[3]]||'',
+          hours:obj['교육시간']||obj[headers[4]]||'',
+          done: obj['이수여부']||obj[headers[5]]||'이수',
+        });
+      }
+      localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+      showToast(`✅ 교육 ${rows.length-1}건 업로드. 저장 버튼을 눌러주세요.`);
+    } catch(err) { showToast('오류: '+err.message); }
+  };
+  reader.readAsBinaryString(file);
+  e.target.value='';
+}
+
+// ── 근태 ──
+function editAttend(key, month, field, val) {
+  const ex = getExtra(key);
+  if (!ex.attend) ex.attend = {months:[]};
+  let mo = ex.attend.months.find(m=>m.month===month);
+  if (!mo) { mo={month,late:0,absent:0,leave:0}; ex.attend.months.push(mo); }
+  mo[field] = Number(val)||0;
+}
+function attendExcelUpload(e, key) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(ev.target.result,{type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if (rows.length<2){showToast('데이터가 없습니다.');return;}
+      const ex = getExtra(key);
+      if(!ex.attend) ex.attend={months:[]};
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i]; if(r.every(c=>c===''))continue;
+        const month=Number(r[0])||0;
+        if(month<1||month>12)continue;
+        let mo=ex.attend.months.find(m=>m.month===month);
+        if(!mo){mo={month,late:0,absent:0,leave:0};ex.attend.months.push(mo);}
+        mo.late=Number(r[1])||0; mo.absent=Number(r[2])||0; mo.leave=Number(r[3])||0;
+      }
+      localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+      showToast('✅ 근태 업로드 완료. 저장 버튼을 눌러주세요.');
+    } catch(err){showToast('오류: '+err.message);}
+  };
+  reader.readAsBinaryString(file); e.target.value='';
+}
+
+// ── 발령이력 ──
+function editHistory(key, idx, field, val) {
+  const ex = getExtra(key);
+  if (!ex.history[idx]) ex.history[idx]={};
+  ex.history[idx][field] = val;
+}
+function addHistoryRow(key) {
+  const ex = getExtra(key);
+  ex.history.push({date:'',bJikchek:'',bJikgup:'',bDept:'',aJikchek:'',aJikgup:'',aDept:'',note:''});
+  localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+  const safeKey = key.replace(/[^a-zA-Z0-9]/g,'_');
+  const tb = document.getElementById('history-tbody-'+safeKey);
+  if (!tb) return;
+  const i = ex.history.length-1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="" onchange="editHistory('${key}',${i},'date',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="" onchange="editHistory('${key}',${i},'bJikchek',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="" onchange="editHistory('${key}',${i},'bJikgup',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="" onchange="editHistory('${key}',${i},'bDept',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="" onchange="editHistory('${key}',${i},'aJikchek',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:70px" value="" onchange="editHistory('${key}',${i},'aJikgup',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="" onchange="editHistory('${key}',${i},'aDept',this.value)"></td>
+    <td><input class="form-input" style="font-size:11px;padding:4px 6px;width:100px" value="" onchange="editHistory('${key}',${i},'note',this.value)"></td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteHistory('${key}',${i})">삭제</button></td>`;
+  tb.appendChild(tr);
+}
+function deleteHistory(key, idx) {
+  const ex = getExtra(key);
+  ex.history.splice(idx,1);
+  localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+  showToast('삭제됨. 저장 버튼을 눌러주세요.');
+  const safeKey = key.replace(/[^a-zA-Z0-9]/g,'_');
+  const tb = document.getElementById('history-tbody-'+safeKey);
+  if (tb) { const rows=tb.querySelectorAll('tr'); if(rows[idx])rows[idx].remove(); }
+}
+function historyExcelUpload(e, key) {
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){showToast('데이터가 없습니다.');return;}
+      const ex=getExtra(key);
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i]; if(r.every(c=>c===''))continue;
+        ex.history.push({
+          date:String(r[0]||'').trim(), bJikchek:String(r[1]||'').trim(),
+          bJikgup:String(r[2]||'').trim(), bDept:String(r[3]||'').trim(),
+          aJikchek:String(r[4]||'').trim(), aJikgup:String(r[5]||'').trim(),
+          aDept:String(r[6]||'').trim(), note:String(r[7]||'').trim(),
+        });
+      }
+      localStorage.setItem('hr_extra',JSON.stringify(hrExtra));
+      showToast(`✅ 발령이력 ${rows.length-1}건 업로드. 저장 버튼을 눌러주세요.`);
+    }catch(err){showToast('오류: '+err.message);}
+  };
+  reader.readAsBinaryString(file); e.target.value='';
+}
+
+// ── 근태 아코디언 ──
+function toggleAttend(safeKey) {
+  const body  = document.getElementById('attend-body-'  + safeKey);
+  const arrow = document.getElementById('attend-arrow-' + safeKey);
+  if (!body) return;
+  const open = body.style.display === 'none';
+  body.style.display  = open ? 'block' : 'none';
+  if (arrow) arrow.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+// ── MBO 모달 ──
+function openMboModal(key, pdfKey, label) {
+  const pdfs = hrPdfs[key] || {};
+  const b64  = pdfs[pdfKey] || '';
+  const overlay = document.getElementById('mbo-modal-overlay');
+  const title   = document.getElementById('mbo-modal-title');
+  const frame   = document.getElementById('mbo-modal-frame');
+  const empty   = document.getElementById('mbo-modal-empty');
+  if (!overlay) return;
+  title.textContent = label + ' MBO';
+  if (b64) {
+    frame.src = b64;
+    frame.style.display = 'block';
+    empty.style.display = 'none';
+  } else {
+    frame.src = '';
+    frame.style.display = 'none';
+    empty.style.display = 'block';
+  }
+  overlay.style.display = 'flex';
+}
+function closeMboModal() {
+  const overlay = document.getElementById('mbo-modal-overlay');
+  if (overlay) { overlay.style.display = 'none'; }
+  const frame = document.getElementById('mbo-modal-frame');
+  if (frame) frame.src = '';
+}
+// ESC 키로 닫기
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMboModal(); });
+
+function hrSetResult(id, type, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'upload-result ' + (type==='ok'?'upload-ok':'upload-warn');
+  el.innerHTML = msg; el.style.display = 'block';
+}
+
+// ══ 분기 관리 ══
+async function setActiveQuarter() {
+  const y = parseInt(document.getElementById('aq-year').value);
+  const q = parseInt(document.getElementById('aq-quarter').value);
+  if (!confirm(`활성 분기를 ${y}년 ${q}분기로 변경하시겠습니까?\n\n변경 후 평가 입력이 새 분기로 전환됩니다.`)) return;
+  activeQuarter = {year:y, quarter:q};
+  try {
+    await db.collection('system').doc('config').set({activeQuarter});
+  } catch(e) { console.warn(e); }
+  // 새 분기 evalData 로드
+  evalData = await loadQuarterData(y, q);
+  persons.forEach(p => {
+    if (!evalData[p.no]) evalData[p.no] = {g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
+  });
+  updateQuarterUI();
+  renderAdminOverview();
+  showToast(`✅ ${y}년 ${q}분기로 전환됐습니다.`);
+}
+
+function updateQuarterUI() {
+  const badge = document.getElementById('aq-badge');
+  if (badge) badge.textContent = `${activeQuarter.year}년 ${activeQuarter.quarter}분기 활성`;
+  const ysel = document.getElementById('aq-year');
+  const qsel = document.getElementById('aq-quarter');
+  if (ysel) ysel.value = activeQuarter.year;
+  if (qsel) qsel.value = activeQuarter.quarter;
+  // 과거 분기 드롭다운 갱신
+  const vsel = document.getElementById('view-quarter-sel');
+  if (vsel) {
+    vsel.innerHTML = '<option value="">현재 분기 보기</option>';
+    const years = [2024,2025,2026,2027];
+    years.forEach(y => {
+      [1,2,3,4].forEach(q => {
+        if (y < activeQuarter.year || (y===activeQuarter.year && q < activeQuarter.quarter)) {
+          vsel.innerHTML += `<option value="${y}_${q}">${y}년 ${q}분기</option>`;
+        }
+      });
+    });
+  }
+  // topbar 분기 표시 업데이트
+  const sub = document.getElementById('topbar-sub');
+  if (sub && currentUser) {
+    const org = currentUser.role==='admin' ? '관리자' : (currentUser.dept||'');
+    sub.textContent = org;
+  }
+}
+
+let viewingQuarterData = null; // 과거 분기 조회 중이면 해당 데이터
+async function loadViewQuarter() {
+  const sel = document.getElementById('view-quarter-sel');
+  const val = sel ? sel.value : '';
+  if (!val) {
+    viewingQuarterData = null;
+    renderAdminOverview();
+    renderResult();
+    showToast('현재 분기로 돌아왔습니다.');
+    return;
+  }
+  const [y, q] = val.split('_').map(Number);
+  showToast(`${y}년 ${q}분기 데이터 불러오는 중...`);
+  viewingQuarterData = await loadQuarterData(y, q);
+  renderAdminOverview();
+  renderResult();
+  showToast(`✅ ${y}년 ${q}분기 조회 중`);
+}
+
+// 현재 화면에서 쓸 evalData (조회 모드면 과거 데이터)
+function getDisplayEvalData() {
+  return viewingQuarterData || evalData;
+}
+
+// ══ CSV EXPORT ══
+function exportCSV(){
+  let rows=['순번,이름,직책,직책년차,담당평가자,점수,등급,인센티브,서술등급,상태'];
+  persons.forEach((p,i)=>{
+    const d=evalData[p.no]||{}; const score=calcScore(d); const grade=calcGrade(score);
+    const incv=score!==null?isIncentive(grade,p.nyeoncha)?'지급':'미지급':'미평가';
+    rows.push(`${i+1},${p.name},${p.jikchek},${p.nyeoncha},${getEvaluatorName(p.evaluatorId)},${score||''},${grade||''},${incv},${d.cGrade||''},${d.done?'완료':'미완료'}`);
+  });
+  const blob=new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='26년1분기직책자평가결과.csv'; a.click();
+  showToast('📥 CSV 파일 다운로드 완료');
+}
+
+// ══ TOAST ══
+function showToast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ══ MODAL OUTSIDE CLICK ══
+['modal-person','modal-account'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){if(e.target===this){this.classList.remove('show');}});
+});
+
+// ══ INIT ══
+load().then(() => {
+  // 로그인 화면 표시 (load 완료 후)
+}).catch(err => {
+  console.error('초기화 오류:', err);
+});
+</script>
+</body>
+</html>

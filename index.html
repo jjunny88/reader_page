@@ -161,6 +161,7 @@ textarea.comment:focus{outline:none;border-color:var(--primary-light);}
 .upload-warn{background:#fff8e1;color:#b7791f;border-left:3px solid #e8b84b;}
 @media(max-width:900px){.stats-grid{grid-template-columns:repeat(2,1fr);}}
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
 <body>
 
@@ -319,9 +320,9 @@ const DEFAULT_PERSONS = [
   {no:9,name:'이정혁',sabun:'',company:'이투스기술학원',bonbu:'O2O플랫폼사업본부',jijum:'이투스기술학원',sil:'행정실',team:'학생지도1팀',jikchek:'팀장',jikchekgup:'',jikgup:'과장',email:'',nyeoncha:'1년차 1분기',bigo:'',evaluatorId:'EMP001'},
 ];
 
-const GRADE_SCORES = {S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
-const GRADES = ['S','A1','A2','B','C','D','E'];
-const GRADE_LABEL = {S:'S (매우우수)',A1:'A(96·우수)',A2:'A(90·우수)',B:'B (양호)',C:'C (보통)',D:'D (미흡)',E:'E (매우미흡)'};
+const GRADE_SCORES = {S:100, A:90, B:80, C:70, D:60, E:50};
+const GRADES = ['S','A','B','C','D','E'];
+const GRADE_LABEL = {S:'S (최우수)', A:'A (우수)', B:'B (양호)', C:'C (보통)', D:'D (미흡)', E:'E (최하)'};
 
 // ══ STATE ══
 let currentUser = null;
@@ -522,16 +523,17 @@ function initApp() {
   nav.innerHTML = '';
   const adminMenus = [
     {section:'현황'},
-    {page:'overview', icon:'📋', label:'직책자 현황'},
-    {page:'result',   icon:'📊', label:'전체 평가 결과'},
+    {page:'overview',   icon:'📋', label:'직책자 현황'},
+    {page:'result',     icon:'📊', label:'전체 평가 결과'},
+    {page:'dashboard',  icon:'📡', label:'접속 현황'},
     {section:'인사현황'},
-    {page:'hr-list',  icon:'👤', label:'인적사항 목록'},
-    {page:'hr-upload',icon:'📂', label:'인사 데이터 업로드'},
+    {page:'hr-list',    icon:'👤', label:'인적사항 목록'},
+    {page:'hr-upload',  icon:'📂', label:'인사 데이터 업로드'},
     {section:'관리'},
-    {page:'persons',  icon:'👥', label:'직책자 관리'},
-    {page:'accounts', icon:'🔐', label:'계정 관리'},
+    {page:'persons',    icon:'👥', label:'직책자 관리'},
+    {page:'accounts',   icon:'🔐', label:'계정 관리'},
     {section:'기준'},
-    {page:'criteria', icon:'📌', label:'등급 기준'},
+    {page:'criteria',   icon:'📌', label:'등급 기준'},
   ];
   const evalMenus = [
     {section:'평가'},
@@ -574,6 +576,148 @@ function initApp() {
 // ══════════════════════
 function buildAdminPages() {
   return `
+  <!-- 접속 현황 대시보드 -->
+  <div class="page" id="page-dashboard">
+    <div style="margin-bottom:14px;padding:6px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;display:inline-block;font-size:11px;color:var(--text-muted)">
+      📌 더미 데이터 · 실제 로그 연동 전 시안
+    </div>
+
+    <!-- 요약 카드 3개 -->
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px">
+      <div class="stat-card"><div class="stat-label">오늘 접속자</div><div class="stat-val" style="color:var(--primary)">12명</div><div class="stat-sub" style="color:var(--success)">↑ 어제보다 3명</div></div>
+      <div class="stat-card"><div class="stat-label">이번 주 접속</div><div class="stat-val" style="color:var(--primary)">67명</div><div class="stat-sub" style="color:var(--success)">↑ 지난주보다 12명</div></div>
+      <div class="stat-card"><div class="stat-label">미접속 부서장</div><div class="stat-val" style="color:var(--accent)">3명</div><div class="stat-sub" style="color:var(--accent)">7일 이상 미접속</div></div>
+    </div>
+
+    <!-- 일별 그래프 -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <span class="card-title">일별 접속자 수</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button id="dash-btn-q1" onclick="switchDashPeriod('q1')"
+            class="btn btn-primary btn-sm">1분기 (1/1~1/13)</button>
+          <button id="dash-btn-q2" onclick="switchDashPeriod('q2')"
+            class="btn btn-outline btn-sm">2분기 (3/1~3/13)</button>
+          <button id="dash-btn-all" onclick="switchDashPeriod('all')"
+            class="btn btn-outline btn-sm">전체</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:16px;margin-bottom:10px">
+          <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#3266AD;display:inline-block"></span>접속자</span>
+          <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#2E7D32;display:inline-block"></span>평가 입력 (평가기간만)</span>
+        </div>
+        <div style="position:relative;height:200px"><canvas id="dash-line-chart"></canvas></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-bottom:16px">
+
+      <!-- 사용자별 최근 접속 -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">사용자별 최근 접속</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">최근 7일</span>
+        </div>
+        <div class="card-body" style="padding-top:8px">
+          ${[
+            {name:'곽용호', time:'오늘 10:23', cnt:12, warn:false},
+            {name:'이문성', time:'오늘 09:41', cnt:9,  warn:false},
+            {name:'김선영', time:'어제 17:52', cnt:7,  warn:false},
+            {name:'박민준', time:'3일 전',     cnt:4,  warn:false},
+            {name:'최동훈', time:'5일 전',     cnt:2,  warn:true},
+          ].map(r=>`
+            <div style="display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
+              <span style="flex:1;font-weight:${r.warn?'400':'600'};color:${r.warn?'var(--text-muted)':'var(--text)'}">${r.name}</span>
+              <span style="font-size:11px;color:var(--text-muted);margin-right:12px">${r.time}</span>
+              <span style="font-weight:700;color:${r.warn?'var(--danger)':'var(--primary)'}">${r.cnt}회</span>
+            </div>`).join('')}
+          <div style="margin-top:10px;padding:8px 12px;background:#fff8e1;border-radius:7px;font-size:12px;color:#b45309;border:1px solid #fde68a">
+            미접속 7일 이상: 이철수, 박지영, 최동훈
+          </div>
+        </div>
+      </div>
+
+      <!-- 본부장별 조회 활동 -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">본부장별 조회 활동</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">개인 카드 조회 · 이번 달</span>
+        </div>
+        <div class="card-body" style="padding-top:8px">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px">
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">개인 카드 조회 횟수</div>
+              ${[
+                {rank:1, name:'곽용호', cnt:23, top:true},
+                {rank:2, name:'이문성', cnt:18, top:true},
+                {rank:3, name:'김선영', cnt:9,  top:false},
+                {rank:4, name:'박민준', cnt:4,  top:false},
+                {rank:5, name:'최동훈', cnt:0,  top:false},
+              ].map(r=>`
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+                  <span style="width:18px;text-align:center;font-weight:700;color:${r.top?'var(--accent)':'var(--text-muted)'}">${r.rank}</span>
+                  <span style="flex:1;color:${r.cnt===0?'var(--text-muted)':'var(--text)'}">${r.name}</span>
+                  <span style="font-weight:700;color:${r.cnt===0?'var(--danger)':'var(--primary)'}">${r.cnt}회</span>
+                </div>`).join('')}
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">타부서 조회 비율</div>
+              ${[
+                {name:'곽용호', pct:52},
+                {name:'이문성', pct:38},
+                {name:'김선영', pct:22},
+                {name:'박민준', pct:10},
+                {name:'최동훈', pct:0},
+              ].map(r=>`
+                <div style="margin-bottom:8px">
+                  <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+                    <span style="color:${r.pct===0?'var(--text-muted)':'var(--text)'}">${r.name}</span>
+                    <span style="font-weight:700;color:${r.pct===0?'var(--danger)':'var(--primary)'}">${r.pct}%</span>
+                  </div>
+                  <div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden">
+                    <div style="height:100%;width:${r.pct}%;background:#3266AD;border-radius:3px"></div>
+                  </div>
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 직책자 조회 현황 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">직책자 조회 현황</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">총 조회 횟수 · 조회한 본부장 직접 표시</span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px">
+          ${[
+            {rank:1, name:'홍길동', pos:'팀장 · 전략실',    cnt:18, viewers:['곽용호','이문성','김선영'], other:true},
+            {rank:2, name:'박지수', pos:'실장 · 경영지원실', cnt:14, viewers:['곽용호','이문성'],         other:true},
+            {rank:3, name:'이준혁', pos:'팀장 · IT지원실',   cnt:11, viewers:['곽용호'],                  other:true},
+            {rank:4, name:'김민아', pos:'팀장 · 협력실',     cnt:9,  viewers:['이문성'],                  other:true},
+            {rank:5, name:'최성민', pos:'팀장 · 운영실',     cnt:7,  viewers:[],                          other:false},
+            {rank:6, name:'정다연', pos:'실장 · 전략실',     cnt:5,  viewers:[],                          other:false},
+          ].map(r=>`
+            <div style="display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px">
+              <span style="width:20px;text-align:center;font-weight:700;color:${r.rank<=2?'var(--accent)':'var(--text-muted)'};flex-shrink:0;margin-top:2px">${r.rank}</span>
+              <div style="flex:1">
+                <div style="font-weight:600">${r.name}</div>
+                <div style="font-size:11px;color:var(--text-muted)">${r.pos}</div>
+                ${r.viewers.length ? `<div style="font-size:11px;color:#1565c0;margin-top:2px">타부서: ${r.viewers.join(', ')}</div>` : `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">본인 담당만</div>`}
+              </div>
+              <span style="font-weight:700;color:var(--primary);flex-shrink:0">${r.cnt}회</span>
+            </div>`).join('')}
+        </div>
+        <div style="margin-top:12px;padding:8px 12px;background:#e3f2fd;border-radius:8px;font-size:12px;color:#1565c0">
+          파란색 이름 = 타부서 본부장이 직접 조회한 직책자
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Overview -->
   <div class="page" id="page-overview">
     <!-- 분기 설정 바 -->
@@ -777,26 +921,54 @@ function buildEvalPages() {
   return `
   <!-- My Overview -->
   <div class="page" id="page-my-overview">
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">담당 직책자</div><div class="stat-val" id="my-stat-total">-</div><div class="stat-sub">내 평가 대상</div></div>
-      <div class="stat-card"><div class="stat-label">평가 완료</div><div class="stat-val" id="my-stat-done" style="color:var(--success)">0</div><div class="stat-sub"><div class="progress-bar"><div class="progress-fill" id="my-prog"></div></div></div></div>
-      <div class="stat-card"><div class="stat-label">인센티브 지급 대상</div><div class="stat-val" id="my-stat-incentive" style="color:var(--accent)">0</div><div class="stat-sub">지급 확정</div></div>
-      <div class="stat-card"><div class="stat-label">평균 점수</div><div class="stat-val" id="my-stat-avg" style="color:var(--primary)">-</div><div class="stat-sub">완료자 기준</div></div>
+
+    <!-- 팀 구성 -->
+    <div class="stats-grid" style="margin-bottom:12px">
+      <div class="stat-card"><div class="stat-label">부서 내 직책자</div><div class="stat-val" id="my-stat-total">-</div><div class="stat-sub" id="my-stat-dept">-</div></div>
+      <div class="stat-card"><div class="stat-label">실장</div><div class="stat-val" id="my-stat-siljang" style="color:var(--primary)">-</div><div class="stat-sub">실장 직책</div></div>
+      <div class="stat-card"><div class="stat-label">팀장</div><div class="stat-val" id="my-stat-teamjang" style="color:var(--primary)">-</div><div class="stat-sub">팀장 직책</div></div>
     </div>
+
+    <!-- 평가 현황 -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="my-quarter-badge" class="badge badge-gold" style="font-size:12px">-</span>
+          <span style="font-size:12px;color:var(--text-muted)">평가 기준</span>
+        </div>
+        <div style="margin-left:auto">
+          <select id="my-view-quarter" class="form-input" style="width:150px;padding:5px 8px;font-size:12px" onchange="renderMyOverview()">
+            <option value="">현재 분기</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body" style="padding-top:10px">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-label">평가 완료</div><div class="stat-val" id="my-stat-done" style="color:var(--success)">0</div><div class="stat-sub"><div class="progress-bar"><div class="progress-fill" id="my-prog"></div></div></div></div>
+          <div class="stat-card"><div class="stat-label">인센티브 지급대상</div><div class="stat-val" id="my-stat-incentive" style="color:var(--accent)">0</div><div class="stat-sub">지급 확정</div></div>
+          <div class="stat-card"><div class="stat-label">평균 점수</div><div class="stat-val" id="my-stat-avg" style="color:var(--primary)">-</div><div class="stat-sub">완료자 기준</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 직책자 테이블 -->
     <div class="card">
       <div class="card-header">
-        <span class="card-title">■ 담당 직책자 현황</span>
-        <span style="margin-left:auto"><button class="btn btn-accent btn-sm" onclick="showPage('eval')">✏️ 평가 입력하기</button></span>
+        <span class="card-title">■ 부서 내 직책자 현황</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="showPage('hr-list')">👥 전체 직책자 현황</button>
+          <button class="btn btn-accent btn-sm" onclick="showPage('eval')">✏️ 평가 입력하기</button>
+        </div>
       </div>
       <div class="card-body">
-        <div class="alert alert-info">※ 본인이 담당하는 직책자만 표시됩니다.</div>
         <div class="tbl-wrap"><table id="my-overview-table">
           <thead><tr>
-            <th>순번</th><th>이름</th><th>본부</th><th>실/센터</th><th>팀</th><th>직급</th><th>직책</th><th>직책년차</th><th>비고</th><th style="background:#e8b84b;color:#1a3a5c">1분기 평가</th>
+            <th>순번</th><th>이름</th><th>본부</th><th>실/센터</th><th>팀</th><th>직급</th><th>직책</th><th>직책년차</th>
+            <th style="background:#e8b84b;color:#1a3a5c;width:90px">평가</th>
+            <th style="background:#3266AD;color:#fff;width:90px">인적사항</th>
           </tr></thead>
           <tbody id="my-overview-tbody"></tbody>
         </table></div>
-        <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">↑ 위 링크를 클릭하거나 [평가 입력하기] 버튼을 눌러 평가를 진행해주세요</div>
       </div>
     </div>
   </div>
@@ -923,7 +1095,7 @@ function renderMyDashboard() {
   const score = calcScore(d);
   const grade = calcGrade(score);
   const incv = score !== null ? isIncentive(grade, p.nyeoncha) : null;
-  const cs = {S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+  const cs = {S:100,A:90,B:80,C:70,D:60,E:50};
 
   const gradeColor = {S:'#c62828',A:'#1565c0',B:'#2e7d32',C:'#e65100',D:'#6b7a8d',E:'#6b7a8d'};
   const gColor = grade ? (gradeColor[grade]||'#1a3a5c') : '#aaa';
@@ -1075,12 +1247,13 @@ function showPage(name) {
 
   if (name==='overview')    renderAdminOverview();
   if (name==='result')      renderResult();
+  if (name==='dashboard')   initDashboard();
   if (name==='persons')     renderPersonsAdmin();
   if (name==='accounts')    renderAccountsAdmin();
   if (name==='my-overview') renderMyOverview();
   if (name==='eval')        renderEvalForm();
   if (name==='my-dashboard')renderMyDashboard();
-  if (name==='hr-list')     renderHrList();
+  if (name==='hr-list')     { hrFilterBonbu = null; renderHrList(); }
   if (name==='hr-upload')   renderHrUpload();
 }
 
@@ -1095,20 +1268,29 @@ function calcScore(d) {
 function calcGrade(score) {
   if (score===null) return '';
   if (score===100) return 'S';
-  if (score>=90) return 'A'; if (score>=80) return 'B';
-  if (score>=70) return 'C'; if (score>=60) return 'D'; return 'E';
+  if (score>=90) return 'A';
+  if (score>=80) return 'B';
+  if (score>=70) return 'C';
+  if (score>=60) return 'D';
+  return 'E';
 }
 function isIncentive(grade, nyeoncha) {
-  const y3 = parseInt(nyeoncha)>=3 || nyeoncha.startsWith('3') || nyeoncha.startsWith('4');
-  if (grade==='S'||grade==='A') return true;
-  if (grade==='B' && !y3) return true;
-  return false;
+  if (!grade || !nyeoncha) return null; // 직책년차 없으면 null (표시 안함)
+  const yr = parseInt(nyeoncha) || 0;
+  if (yr <= 0) return null;
+  if (yr <= 2) return (grade==='S' || grade==='A' || grade==='B'); // 1~2년차: B이상
+  return (grade==='S' || grade==='A'); // 3년차↑: A이상
+}
+function incentiveLabel(grade, nyeoncha) {
+  const result = isIncentive(grade, nyeoncha);
+  if (result===null) return '-';
+  return result ? `${grade}(지급)` : `${grade}(미지급)`;
 }
 function gradeClass(g) {
   if (!g) return ''; return 'grade-'+g;
 }
 function gradeOpt(sel) {
-  return GRADES.map(g=>`<option value="${g}"${sel===g?' selected':''}>${g==='A1'?'A(96)':g==='A2'?'A(90)':g}</option>`).join('');
+  return GRADES.map(g=>`<option value="${g}"${sel===g?' selected':''}>${g}</option>`).join('');
 }
 function getEvaluatorName(id) {
   const a = accounts.find(x=>x.id===id);
@@ -1136,7 +1318,10 @@ function renderAdminOverview() {
       <td style="font-size:11px">${p.nyeoncha}</td>
       <td style="font-size:10px;color:var(--text-muted)">${p.bigo}</td>
       <td><span style="font-size:11px">${getEvaluatorName(p.evaluatorId)}</span></td>
-      <td>${d.done ? `<span class="${gradeClass(grade)}" style="font-weight:700">${grade}(${score}점)</span>` : `<span class="complete-chip chip-pending">미완료</span>`}</td>
+      <td>${d.done
+        ? `<span class="complete-chip chip-done" style="font-size:12px;font-weight:600">✅ 완료</span>`
+        : `<span style="display:inline-block;padding:4px 12px;background:#ffebee;color:#c62828;
+            border:1.5px solid #ef9a9a;border-radius:20px;font-size:12px;font-weight:700">미완료</span>`}</td>
     </tr>`;
   });
 }
@@ -1170,15 +1355,17 @@ function renderResult() {
   const _ed = getDisplayEvalData();
   persons.forEach((p,i)=>{
     const d=_ed[p.no]||{}; const score=calcScore(d); const grade=calcGrade(score);
-    const incv=score!==null?isIncentive(grade,p.nyeoncha):false;
-    const cs={S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+    const incv = score!==null ? isIncentive(grade, p.nyeoncha) : null;
+    const cs={S:100,A:90,B:80,C:70,D:60,E:50};
+    const incvTxt = incv===null ? '-' : (incv ? '지급' : '미지급');
+    const incvClass = incv===null ? '' : (incv ? 'incentive-y' : 'incentive-n');
     tb.innerHTML+=`<tr>
       <td>${i+1}</td><td><strong>${p.name}</strong></td><td>${p.jikchek}</td><td style="font-size:11px">${p.nyeoncha}</td>
       <td style="font-size:11px">${getEvaluatorName(p.evaluatorId)}</td>
       <td>${d.g1||'-'}</td><td>${d.g2||'-'}</td><td>${d.g3||'-'}</td><td>${d.g4||'-'}</td><td>${d.g5||'-'}</td>
       <td><span class="${gradeClass(grade)}">${grade||'-'}</span></td>
       <td><strong>${score!==null?score:'-'}</strong></td>
-      <td class="${score!==null?(incv?'incentive-y':'incentive-n'):''}">${score!==null?(incv?'지급':'미지급'):'-'}</td>
+      <td class="${incvClass}">${incvTxt}</td>
       <td><span class="${gradeClass(d.cGrade)}">${d.cGrade||'-'}</span></td>
       <td>${d.done?'<span class="complete-chip chip-done">완료</span>':'<span class="complete-chip chip-pending">미완료</span>'}</td>
     </tr>`;
@@ -1289,35 +1476,101 @@ function renderAccountsAdmin() {
 // ══════════════════════
 function renderMyOverview() {
   const myP = getMyPersons();
-  let done=0,incentive=0,totalScore=0;
-  myP.forEach(p=>{
-    const d=evalData[p.no]||{}; const score=calcScore(d); const grade=calcGrade(score);
-    if(d.done&&score!==null){done++;totalScore+=score;if(isIncentive(grade,p.nyeoncha))incentive++;}
-  });
-  const avg=done>0?Math.round(totalScore/done):null;
-  const setEl=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-  setEl('my-stat-total',myP.length);setEl('my-stat-done',done);setEl('my-stat-incentive',incentive);
-  setEl('my-stat-avg',avg!==null?avg+'점':'-');
-  const pr=document.getElementById('my-prog');if(pr)pr.style.width=(myP.length>0?done/myP.length*100:0)+'%';
 
-  const db=document.getElementById('done-badge');const pb=document.getElementById('pending-badge');
-  if(db){db.textContent='완료: '+done+'명';db.style.display='inline-flex';}
-  if(pb){pb.textContent='미완료: '+(myP.length-done)+'명';pb.style.display='inline-flex';}
+  // 드롭다운 최초 1회 채우기
+  const qSel = document.getElementById('my-view-quarter');
+  if (qSel && qSel.options.length <= 1) {
+    for (let y=2024; y<=2027; y++) {
+      for (let q=1; q<=4; q++) {
+        const opt = document.createElement('option');
+        opt.value = `${y}_${q}`;
+        opt.textContent = `${y}년 ${q}분기`;
+        qSel.appendChild(opt);
+      }
+    }
+  }
 
-  const tb=document.getElementById('my-overview-tbody');
-  if(!tb)return;
-  tb.innerHTML='';
-  myP.forEach((p,i)=>{
-    const d=evalData[p.no]||{}; const score=calcScore(d); const grade=calcGrade(score);
-    tb.innerHTML+=`<tr>
-      <td>${i+1}</td><td><strong>${p.name}</strong></td><td style="font-size:11px">${p.bonbu}</td>
-      <td>${p.sil}</td><td>${p.team}</td><td>${p.jikgup}</td><td>${p.jikchek}</td>
-      <td style="font-size:11px">${p.nyeoncha}</td>
-      <td style="font-size:10px;color:var(--text-muted)">${p.bigo}</td>
-      <td>${d.done?`<span class="${gradeClass(grade)}" style="font-weight:700">${grade}(${score}점)</span>`
-        :`<a href="#" onclick="showPage('eval');return false;" style="color:var(--primary);font-size:11px;text-decoration:underline">평가 하기</a>`}</td>
-    </tr>`;
-  });
+  // 분기 결정
+  const selVal = qSel?.value || '';
+  let viewYear = activeQuarter.year;
+  let viewQ    = activeQuarter.quarter;
+  if (selVal) {
+    const p = selVal.split('_');
+    viewYear = Number(p[0]); viewQ = Number(p[1]);
+  }
+
+  // 분기 배지
+  const badge = document.getElementById('my-quarter-badge');
+  if (badge) badge.textContent = `${viewYear}년 ${viewQ}분기`;
+
+  // 팀 구성
+  const siljang  = myP.filter(p=>(p.jikchek||'').includes('실장')).length;
+  const teamjang = myP.filter(p=>(p.jikchek||'').includes('팀장')).length;
+  const dept     = currentUser.dept || currentUser.jijum || '';
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('my-stat-total',    myP.length+'명');
+  setEl('my-stat-dept',     dept);
+  setEl('my-stat-siljang',  siljang+'명');
+  setEl('my-stat-teamjang', teamjang+'명');
+
+  // 렌더 함수
+  const doRender = (ed) => {
+    let done=0, incentive=0, totalScore=0;
+    myP.forEach(p => {
+      const d=ed[p.no]||{};
+      const score=calcScore(d); const grade=calcGrade(score);
+      if (d.done && score!==null) {
+        done++; totalScore+=score;
+        if (isIncentive(grade, p.nyeoncha)) incentive++;
+      }
+    });
+    const avg = done>0 ? Math.round(totalScore/done) : null;
+    setEl('my-stat-done',      done);
+    setEl('my-stat-incentive', incentive);
+    setEl('my-stat-avg',       avg!==null ? avg+'점' : '-');
+    const pr = document.getElementById('my-prog');
+    if (pr) pr.style.width = (myP.length>0 ? done/myP.length*100 : 0)+'%';
+
+    const tb = document.getElementById('my-overview-tbody');
+    if (!tb) return;
+    tb.innerHTML='';
+    myP.forEach((p,i) => {
+      const d = ed[p.no]||{};
+      const sabunEnc = encodeURIComponent(p.sabun||'');
+      const nameEnc  = encodeURIComponent(p.name||'');
+      tb.innerHTML += `<tr>
+        <td>${i+1}</td>
+        <td><strong>${p.name}</strong></td>
+        <td style="font-size:11px">${p.bonbu}</td>
+        <td>${p.sil}</td><td>${p.team}</td>
+        <td>${p.jikgup}</td><td>${p.jikchek}</td>
+        <td style="font-size:11px">${p.nyeoncha}</td>
+        <td style="text-align:center">
+          ${d.done
+            ? `<span class="complete-chip chip-done" style="font-size:11px;font-weight:600">✅ 완료</span>`
+            : `<a href="#" onclick="showPage('eval');return false;"
+                style="display:inline-block;padding:3px 10px;background:#ffebee;color:#c62828;
+                border:1.5px solid #ef9a9a;border-radius:20px;font-size:11px;font-weight:700;
+                text-decoration:none">평가하기</a>`}
+        </td>
+        <td style="text-align:center">
+          ${currentUser.hrView
+            ? `<button onclick="showHrDetail('${sabunEnc}','${nameEnc}')"
+                style="padding:3px 10px;background:#e3f2fd;color:#1565c0;border:1.5px solid #90caf9;
+                border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">
+                👤 인적사항</button>`
+            : `<span style="font-size:11px;color:var(--text-muted)">-</span>`}
+        </td>
+      </tr>`;
+    });
+  };
+
+  // 과거 분기면 Firebase에서 로드, 현재 분기면 evalData 그대로
+  if (selVal) {
+    loadQuarterData(viewYear, viewQ).then(ed => doRender(ed));
+  } else {
+    doRender(evalData);
+  }
 }
 
 // ══════════════════════
@@ -1334,7 +1587,7 @@ function renderEvalForm() {
   myP.forEach((p,i)=>{
     const d=evalData[p.no]||{g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
     const score=calcScore(d); const grade=calcGrade(score);
-    const incv=score!==null?isIncentive(grade,p.nyeoncha):false;
+    const incv = score!==null ? isIncentive(grade, p.nyeoncha) : null;
     evalTb.innerHTML+=`<tr>
       <td>${i+1}</td><td><strong>${p.name}</strong></td>
       <td><select class="grade-sel" onchange="updateGrade(${p.no},'g1',this.value)"><option value="">-</option>${gradeOpt(d.g1)}</select></td>
@@ -1342,10 +1595,10 @@ function renderEvalForm() {
       <td><select class="grade-sel" onchange="updateGrade(${p.no},'g3',this.value)"><option value="">-</option>${gradeOpt(d.g3)}</select></td>
       <td><select class="grade-sel" onchange="updateGrade(${p.no},'g4',this.value)"><option value="">-</option>${gradeOpt(d.g4)}</select></td>
       <td><select class="grade-sel" onchange="updateGrade(${p.no},'g5',this.value)"><option value="">-</option>${gradeOpt(d.g5)}</select></td>
-      <td id="eg-${p.no}"><span class="${gradeClass(grade)}">${grade?(grade+(incv?' (지급)':' (미지급)')):'-'}</span></td>
+      <td id="eg-${p.no}"><span class="${gradeClass(grade)}">${grade ? incentiveLabel(grade, p.nyeoncha) : '-'}</span></td>
       <td id="es-${p.no}"><span class="score-display">${score!==null?score+' 점':'-'}</span></td>
     </tr>`;
-    const cs={S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+    const cs={S:100,A:90,B:80,C:70,D:60,E:50};
     commentTb.innerHTML+=`<tr>
       <td>${i+1}</td><td><strong>${p.name}</strong></td>
       <td><input style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:11px;" placeholder="평가 항목 입력..." value="${d.topic||''}" onchange="updateComment(${p.no},'topic',this.value)"></td>
@@ -1365,9 +1618,9 @@ function updateGrade(no, field, val) {
   if(!evalData[no])evalData[no]={g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
   evalData[no][field]=val;
   const d=evalData[no]; const score=calcScore(d); const grade=calcGrade(score);
-  const incv=score!==null?isIncentive(grade,persons.find(p=>p.no===no)?.nyeoncha||''):false;
-  const eg=document.getElementById('eg-'+no);const es=document.getElementById('es-'+no);
-  if(eg)eg.innerHTML=`<span class="${gradeClass(grade)}">${grade?(grade+(incv?' (지급)':' (미지급)')):'-'}</span>`;
+  const p=persons.find(p=>p.no===no);
+  const eg=document.getElementById('eg-'+no); const es=document.getElementById('es-'+no);
+  if(eg)eg.innerHTML=`<span class="${gradeClass(grade)}">${grade ? incentiveLabel(grade, p?.nyeoncha||'') : '-'}</span>`;
   if(es)es.innerHTML=`<span class="score-display">${score!==null?score+' 점':'-'}</span>`;
   if([d.g1,d.g2,d.g3,d.g4,d.g5].every(g=>g!==''))evalData[no].done=true;
 }
@@ -1376,7 +1629,7 @@ function updateComment(no, field, val) {
   if(!evalData[no])evalData[no]={g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
   evalData[no][field]=val;
   if(field==='cGrade'){
-    const cs={S:100,A1:96,A2:90,B:85,C:75,D:65,E:55};
+    const cs={S:100,A:90,B:80,C:70,D:60,E:50};
     const el=document.getElementById('cs-'+no);
     if(el)el.innerHTML=`<span class="score-display">${val?(cs[val]||'-'):'-'}</span>`;
   }
@@ -1898,9 +2151,6 @@ const PDF_TYPES = [
   {key:'mbo2024', label:'MBO 2024'},
   {key:'mbo2025', label:'MBO 2025'},
   {key:'mbo2026', label:'MBO 2026'},
-  {key:'edu',     label:'교육'},
-  {key:'attend',  label:'근태'},
-  {key:'history', label:'발령이력'},
 ];
 
 // 개인 키 생성: 사번 우선 → 이름/성명 폴백 (다양한 컬럼명 지원)
@@ -1922,14 +2172,10 @@ function buildHrListPage() {
     <div class="card">
       <div class="card-header">
         <span class="card-title">👤 직책자 인적사항 목록</span>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <select id="hr-filter-bonbu" class="form-input" style="width:160px;padding:6px 10px" onchange="renderHrList()">
-            <option value="">전체 본부</option>
-          </select>
-          <span style="font-size:11px;color:var(--text-muted)" id="hr-count"></span>
-        </div>
       </div>
       <div class="card-body">
+        <!-- 소속 탭 필터 -->
+        <div id="hr-tab-filter" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)"></div>
         <div id="hr-list-wrap"><div class="alert alert-info">인적사항 엑셀 업로드 후 목록이 표시됩니다.</div></div>
       </div>
     </div>
@@ -1971,6 +2217,46 @@ function buildHrPages() {
 
     <!-- STEP 2: 인원별 PDF 업로드 슬롯 -->
     <div id="hr-pdf-slots"></div>
+
+    <!-- STEP 3: 과거 평가 데이터 업로드 -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-header">
+        <span class="card-title">📊 STEP 3 · 과거 평가 데이터 업로드</span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-accent btn-sm" onclick="downloadPastEvalTemplate()">📥 양식 다운로드</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" style="font-size:11px;margin-bottom:12px">
+          📌 분기별로 파일을 하나씩 업로드하세요. 업로드한 데이터는 개인 상세 카드 리더십 역량에 자동 반영됩니다.<br>
+          필수 컬럼: <strong>사번</strong> (또는 이름) · <strong>항목1~5</strong> (소속/년도별 평가 항목명) · <strong>서술</strong> (부서장 서술, 선택)<br>
+          점수 입력: 100 / 90 / 80 / 70 / 60 / 50 (10점 단위) · 등급 입력도 가능: S / A / B / C / D / E
+        </div>
+
+        <!-- 분기 선택 -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:600;color:var(--primary)">업로드 대상 분기:</span>
+          <select id="past-eval-year" class="form-input" style="width:90px;padding:6px 8px" onchange="updatePastEvalBadge()">
+            ${[2024,2025,2026].map(y=>`<option value="${y}"${y===2025?' selected':''}>${y}년</option>`).join('')}
+          </select>
+          <select id="past-eval-quarter" class="form-input" style="width:80px;padding:6px 8px" onchange="updatePastEvalBadge()">
+            ${[1,2,3,4].map(q=>`<option value="${q}"${q===2?' selected':''}>${q}분기</option>`).join('')}
+          </select>
+          <span id="past-eval-target-badge" style="font-size:12px;font-weight:700;color:var(--accent);padding:4px 12px;background:#fff8e1;border-radius:20px;border:1px solid var(--accent)">
+            → eval_2025_Q2
+          </span>
+        </div>
+
+        <div class="upload-zone" onclick="document.getElementById('f-past-eval').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+          ondrop="pastEvalDrop(event)">
+          <div class="upload-icon">📊</div>
+          <div class="upload-text"><strong>과거 평가 엑셀 클릭 또는 드래그</strong><br>.xlsx / .xls</div>
+        </div>
+        <input type="file" id="f-past-eval" accept=".xlsx,.xls" style="display:none" onchange="pastEvalUpload(event)">
+        <div class="upload-result" id="r-past-eval"></div>
+      </div>
+    </div>
 
   </div>`;
 }
@@ -2061,6 +2347,7 @@ function renderHrPdfSlots() {
             <tr>
               <th style="background:#f0f3f8;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);width:140px">이름 (사번)</th>
               ${PDF_TYPES.map(t=>`<th style="background:#f0f3f8;padding:10px 8px;text-align:center;border-bottom:1px solid var(--border)">${t.label}</th>`).join('')}
+              <th style="background:#f0f3f8;padding:10px 8px;text-align:center;border-bottom:1px solid var(--border);width:80px">사진</th>
             </tr>
           </thead>
           <tbody>
@@ -2069,6 +2356,8 @@ function renderHrPdfSlots() {
               const name = hrName(p) || key;
               const sabun = p['사번']||'';
               const pdfs = hrPdfs[key]||{};
+              const extra = (hrExtra && hrExtra[key])||{};
+              const hasPhoto = !!(extra.photo);
               return `<tr style="border-bottom:1px solid var(--border)">
                 <td style="padding:10px 14px;font-weight:700">${name}${sabun?`<br><span style="font-size:10px;color:var(--text-muted);font-weight:400">${sabun}</span>`:''}</td>
                 ${PDF_TYPES.map(t => {
@@ -2084,6 +2373,26 @@ function renderHrPdfSlots() {
                       style="font-size:10px;background:none;border:none;color:var(--danger);cursor:pointer;margin-top:2px">삭제</button>`:''}
                   </td>`;
                 }).join('')}
+                <!-- 사진 컬럼 -->
+                <td style="text-align:center;padding:6px 4px" id="photo-td-${encodeURIComponent(key)}">
+                  ${hasPhoto
+                    ? `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:3px">
+                        <img src="${extra.photo}" style="width:32px;height:40px;object-fit:cover;border-radius:3px;border:1px solid var(--border)">
+                        <label style="cursor:pointer">
+                          <input type="file" accept="image/*" style="display:none"
+                            onchange="hrPhotoUploadFromTable(event,'${encodeURIComponent(key)}')">
+                          <span style="font-size:10px;color:var(--primary)">변경</span>
+                        </label>
+                        <button onclick="hrPhotoDeleteFromTable('${encodeURIComponent(key)}')"
+                          style="font-size:10px;background:none;border:none;color:var(--danger);cursor:pointer">삭제</button>
+                       </div>`
+                    : `<label style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:3px">
+                        <input type="file" accept="image/*" style="display:none"
+                          onchange="hrPhotoUploadFromTable(event,'${encodeURIComponent(key)}')">
+                        <span style="font-size:18px">🖼️</span>
+                        <span style="font-size:10px;color:var(--text-muted)">업로드</span>
+                       </label>`}
+                </td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -2092,8 +2401,234 @@ function renderHrPdfSlots() {
     </div>`;
 }
 
+// ══ 과거 평가 데이터 업로드 ══
+
+// 분기 선택 변경 시 배지 업데이트 (HTML onchange로 호출)
+function updatePastEvalBadge() {
+  const y = document.getElementById('past-eval-year')?.value;
+  const q = document.getElementById('past-eval-quarter')?.value;
+  const badge = document.getElementById('past-eval-target-badge');
+  if (badge && y && q) badge.textContent = `→ eval_${y}_Q${q}`;
+}
+
+// 양식 다운로드
+function downloadPastEvalTemplate() {
+  const year = Number(document.getElementById('past-eval-year')?.value || 2025);
+  const items = getEvalItems(year, '');
+  const wb = XLSX.utils.book_new();
+  const headers = ['사번','이름', ...items, '서술(부서장평가)'];
+  const samples = [
+    ['ZE001','홍길동', 100, 90, 80, 90, 80, '목표 대비 성과가 우수하며 팀원 동기부여가 탁월합니다.'],
+    ['ZE002','박지수',  90,100, 90, 80, 90, '전략적 사고와 리더십이 뛰어나며 지속적인 성장이 기대됩니다.'],
+    ['ZE003','이준혁',  80, 90,100, 90, 80, ''],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
+  ws['!cols'] = [14,10,...items.map(()=>16),50].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws, '과거평가양식');
+
+  const guide = XLSX.utils.aoa_to_sheet([
+    ['[작성 안내]'],
+    [''],
+    ['1. 사번 또는 이름 중 하나는 반드시 입력하세요.'],
+    ['2. 각 항목은 점수로 입력하세요: 100 / 90 / 80 / 70 / 60 / 50'],
+    ['   (등급 S/A/B/C/D/E 입력도 가능합니다)'],
+    ['3. 서술은 부서장 서술 평가 내용을 입력하세요 (없으면 비워두세요).'],
+    ['4. 업로드 전 대상 년도와 분기를 반드시 선택하세요.'],
+    [''],
+    ['[점수 기준]'],
+    ['100점 = S (최우수)'],
+    [' 90점 = A (우수)'],
+    [' 80점 = B (양호)'],
+    [' 70점 = C (보통)'],
+    [' 60점 = D (미흡)'],
+    [' 50점 = E (최하)'],
+    [''],
+    [`[${year}년 기본 항목 (소속별로 다를 수 있음)]`],
+    ...items.map((it,i)=>[`항목${i+1}: ${it}`]),
+  ]);
+  XLSX.utils.book_append_sheet(wb, guide, '작성안내');
+  XLSX.writeFile(wb, `과거평가_업로드양식_${year}년.xlsx`);
+}
+
+// 드래그앤드롭
+function pastEvalDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) pastEvalProcess(file);
+}
+
+// 파일 선택
+function pastEvalUpload(e) {
+  const file = e.target.files[0];
+  if (file) pastEvalProcess(file);
+  e.target.value = '';
+}
+
+// 실제 처리
+async function pastEvalProcess(file) {
+  const year    = document.getElementById('past-eval-year')?.value;
+  const quarter = document.getElementById('past-eval-quarter')?.value;
+  if (!year || !quarter) { showToast('년도와 분기를 먼저 선택해주세요.'); return; }
+
+  const docKey = `eval_${year}_Q${quarter}`;
+  hrSetResult('r-past-eval', 'info', '⏳ 처리 중...');
+
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (rows.length < 2) { hrSetResult('r-past-eval','warn','데이터가 없습니다.'); return; }
+
+      const headers = rows[0].map(h=>String(h).trim());
+      // 사번/이름 찾기
+      const sabunIdx   = headers.findIndex(h=>h==='사번');
+      const nameIdx    = headers.findIndex(h=>h==='이름');
+      const commentIdx = headers.findIndex(h=>h.startsWith('서술'));
+      // g1~g5: 사번/이름 다음 컬럼부터 서술 이전까지 순서대로
+      const fixedCols = new Set([sabunIdx, nameIdx, commentIdx].filter(i=>i>=0));
+      const gCols = headers.map((_,i)=>i).filter(i=>!fixedCols.has(i)).slice(0,5);
+
+      // 등급→점수, 점수→점수 변환
+      function parseScore(v) {
+        const s = String(v||'').trim().toUpperCase();
+        if (s==='') return '';
+        const n = Number(s);
+        if (!isNaN(n) && n>0) return n; // 점수 직접 입력
+        const gradeMap = {S:100,A:90,B:80,C:70,D:60,E:50};
+        return gradeMap[s] !== undefined ? gradeMap[s] : '';
+      }
+
+      // 기존 데이터 불러오기 (덮어쓰지 않고 머지)
+      let existing = {};
+      try {
+        const doc = await db.collection('evalData').doc(docKey).get();
+        existing = doc.exists ? (doc.data().data || {}) : {};
+      } catch(e) {
+        existing = JSON.parse(localStorage.getItem(docKey) || '{}');
+      }
+
+      let ok = 0, skip = 0;
+      for (let i=1; i<rows.length; i++) {
+        const r = rows[i];
+        if (r.every(c=>c==='')) continue;
+
+        const sabun = sabunIdx>=0 ? String(r[sabunIdx]||'').trim() : '';
+        const name  = nameIdx>=0  ? String(r[nameIdx] ||'').trim() : '';
+
+        // persons에서 no 찾기
+        const person = persons.find(p =>
+          (sabun && p.sabun === sabun) ||
+          (name  && p.name  === name)
+        );
+        if (!person) { skip++; continue; }
+
+        const g1 = parseScore(r[gCols[0]]);
+        const g2 = parseScore(r[gCols[1]]);
+        const g3 = parseScore(r[gCols[2]]);
+        const g4 = parseScore(r[gCols[3]]);
+        const g5 = parseScore(r[gCols[4]]);
+        const comment = commentIdx>=0 ? String(r[commentIdx]||'').trim() : '';
+
+        existing[person.no] = {
+          ...(existing[person.no]||{}),
+          g1, g2, g3, g4, g5, comment,
+          updatedAt: new Date().toISOString(),
+        };
+        ok++;
+      }
+
+      // Firebase 저장
+      try {
+        await db.collection('evalData').doc(docKey).set({data: existing}, {merge:true});
+      } catch(e) {}
+      localStorage.setItem(docKey, JSON.stringify(existing));
+
+      // 레이더 차트 캐시 초기화
+      Object.keys(radarDataCache).forEach(k => { if (k.includes(docKey)) delete radarDataCache[k]; });
+
+      hrSetResult('r-past-eval', 'ok',
+        `✅ ${docKey} 업로드 완료 · ${ok}명 반영 · ${skip}명 미매칭(사번/이름 불일치)`);
+    } catch(err) {
+      hrSetResult('r-past-eval', 'warn', '오류: ' + err.message);
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+
+function hrPhotoUploadFromTable(e, encKey) {
+  const key = decodeURIComponent(encKey);
+  const file = e.target.files[0];
+  if (!file) return;
+  const tdEl = document.getElementById(`photo-td-${encKey}`);
+  if (tdEl) tdEl.innerHTML = `<div style="font-size:11px;color:var(--text-muted)">⏳ 업로드 중...</div>`;
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = async () => {
+      const MAX_W=300, MAX_H=400;
+      let w=img.width, h=img.height;
+      if (w/h > MAX_W/MAX_H) { w=MAX_W; h=Math.round(img.height*MAX_W/img.width); }
+      else { h=MAX_H; w=Math.round(img.width*MAX_H/img.height); }
+      const canvas = document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const blob = await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.85));
+      const path = `photos/${key}/photo.jpg`;
+      const ref = storage.ref(path);
+      try {
+        await ref.put(blob);
+        const url = await ref.getDownloadURL();
+        if (!hrExtra[key]) hrExtra[key] = {};
+        hrExtra[key].photo = url;
+        await db.collection('hrExtra').doc(key).set({photo: url}, {merge:true});
+        if (tdEl) tdEl.innerHTML = `
+          <div style="display:inline-flex;flex-direction:column;align-items:center;gap:3px">
+            <img src="${url}" style="width:32px;height:40px;object-fit:cover;border-radius:3px;border:1px solid var(--border)">
+            <label style="cursor:pointer">
+              <input type="file" accept="image/*" style="display:none"
+                onchange="hrPhotoUploadFromTable(event,'${encKey}')">
+              <span style="font-size:10px;color:var(--primary)">변경</span>
+            </label>
+            <button onclick="hrPhotoDeleteFromTable('${encKey}')"
+              style="font-size:10px;background:none;border:none;color:var(--danger);cursor:pointer">삭제</button>
+          </div>`;
+        showToast(`✅ ${decodeURIComponent(encKey)} 사진 업로드 완료`);
+      } catch(err) {
+        if (tdEl) tdEl.innerHTML = `<span style="font-size:10px;color:var(--danger)">❌ 실패</span>`;
+        showToast('사진 업로드 실패: ' + err.message);
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+
+async function hrPhotoDeleteFromTable(encKey) {
+  const key = decodeURIComponent(encKey);
+  if (!confirm(`${key} 사진을 삭제할까요?`)) return;
+  try {
+    await storage.ref(`photos/${key}/photo.jpg`).delete();
+  } catch(e) {}
+  if (hrExtra[key]) delete hrExtra[key].photo;
+  await db.collection('hrExtra').doc(key).set({photo: ''}, {merge:true});
+  const tdEl = document.getElementById(`photo-td-${encKey}`);
+  if (tdEl) tdEl.innerHTML = `
+    <label style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:3px">
+      <input type="file" accept="image/*" style="display:none"
+        onchange="hrPhotoUploadFromTable(event,'${encKey}')">
+      <span style="font-size:18px">🖼️</span>
+      <span style="font-size:10px;color:var(--text-muted)">업로드</span>
+    </label>`;
+  showToast('사진이 삭제되었습니다.');
+}
+
 // ── PDF 업로드 ──
-// ── PDF 업로드 (Firebase Storage) ──
 function hrPdfUpload(e, encKey, pdfType, tdEl) {
   const key  = decodeURIComponent(encKey);
   const file = e.target.files[0];
@@ -2221,43 +2756,72 @@ const HR_DETAIL_ROWS = [
 const HR_DETAIL_COLS = HR_DETAIL_ROWS.flat().map(c=>c.key).filter(Boolean);
 
 // ── HR 목록 렌더 ──
+// 현재 선택된 소속 필터 상태
+let hrFilterBonbu = null; // null = 초기화 안됨, '' = 전체
+
 function renderHrList() {
   const wrap = document.getElementById('hr-list-wrap');
+  const tabEl = document.getElementById('hr-tab-filter');
   if (!wrap) return;
 
-  const sel = document.getElementById('hr-filter-bonbu');
   function getBonbu(p) { return (p['본부']||p['본부명']||'').trim(); }
 
-  if (sel) {
-    const bonbus = [...new Set(hrPersons.map(p=>getBonbu(p)).filter(Boolean))];
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">전체 본부</option>' + bonbus.map(b=>`<option value="${b}"${b===cur?' selected':''}>${b}</option>`).join('');
+  // 전체 데이터 (권한 필터)
+  let allData = [...hrPersons];
+  if (currentUser.role === 'eval' && !currentUser.hrView) {
+    const myNames  = getMyPersons().map(p=>p.name);
+    const myBonbus = [...new Set(getMyPersons().map(p=>p.bonbu).filter(Boolean))];
+    allData = allData.filter(p => myBonbus.includes(getBonbu(p)) || myNames.includes(hrName(p)));
   }
 
-  let data = [...hrPersons];
+  // 소속 목록 추출
+  const bonbus = [...new Set(allData.map(p=>getBonbu(p)).filter(Boolean))].sort();
 
-  // 평가자: hrView 있으면 전체, 없으면 본인 담당 지점만
-  if (currentUser.role === 'eval') {
-    if (!currentUser.hrView) {
-      const myNames  = getMyPersons().map(p=>p.name);
-      const myBonbus = [...new Set(getMyPersons().map(p=>p.bonbu).filter(Boolean))];
-      data = data.filter(p => myBonbus.includes(getBonbu(p)) || myNames.includes(hrName(p)));
+  // 초기 진입 시 본인 소속 자동 선택 (본부 기준)
+  if (hrFilterBonbu === null) {
+    if (currentUser.role === 'eval') {
+      // 계정의 dept/jijum 으로 본부 매칭 시도
+      const myDept = (currentUser.dept || currentUser.jijum || '').trim();
+      // 본부 목록에서 일치하는 것 찾기
+      const matched = bonbus.find(b => b === myDept || b.includes(myDept) || myDept.includes(b));
+      hrFilterBonbu = matched || (bonbus.length === 1 ? bonbus[0] : '');
+    } else {
+      hrFilterBonbu = '';
     }
-    // hrView=true 면 전체 표시 (필터 없음)
   }
 
-  const filterBonbu = sel ? sel.value : '';
-  if (filterBonbu) data = data.filter(p=>getBonbu(p)===filterBonbu);
+  // 탭 버튼 렌더링
+  if (tabEl) {
+    const counts = {};
+    bonbus.forEach(b => { counts[b] = allData.filter(p=>getBonbu(p)===b).length; });
+    const totalCount = allData.length;
 
-  const cntEl = document.getElementById('hr-count');
-  if(cntEl) cntEl.textContent = data.length+'명';
+    tabEl.innerHTML = `
+      <button onclick="setHrFilter('')"
+        style="padding:6px 14px;border-radius:20px;border:1.5px solid ${hrFilterBonbu===''?'var(--primary)':'var(--border)'};
+        background:${hrFilterBonbu===''?'var(--primary)':'var(--bg)'};
+        color:${hrFilterBonbu===''?'#fff':'var(--text-muted)'};
+        font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">
+        전체 <span style="opacity:0.8">${totalCount}명</span>
+      </button>
+      ${bonbus.map(b=>`
+        <button onclick="setHrFilter('${b}')"
+          style="padding:6px 14px;border-radius:20px;border:1.5px solid ${hrFilterBonbu===b?'var(--primary)':'var(--border)'};
+          background:${hrFilterBonbu===b?'var(--primary)':'var(--bg)'};
+          color:${hrFilterBonbu===b?'#fff':'var(--text-muted)'};
+          font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">
+          ${b} <span style="opacity:0.8">${counts[b]}명</span>
+        </button>`).join('')}`;
+  }
+
+  // 필터 적용
+  let data = hrFilterBonbu ? allData.filter(p=>getBonbu(p)===hrFilterBonbu) : allData;
 
   if (!data.length) {
     wrap.innerHTML = '<div class="alert alert-info">업로드된 인적사항 데이터가 없거나 조건에 맞는 인원이 없습니다.</div>';
     return;
   }
 
-  // 관리자는 고정 순서 컬럼, 평가자/부서장은 HR_LIST_COLS
   const isAdmin = currentUser.role === 'admin';
   const cols = isAdmin ? HR_ADMIN_LIST_COLS : HR_LIST_COLS;
 
@@ -2273,7 +2837,6 @@ function renderHrList() {
           <td style="font-size:12px;text-align:center">${i+1}</td>
           ${cols.map(c=>{
             let v = row[c.key]||'-';
-            // 날짜 숫자 변환
             if (c.key==='현)직책보임일'||c.key==='입사일') v = excelDateToStr(v);
             return `<td style="white-space:nowrap;font-size:12px">${v}</td>`;
           }).join('')}
@@ -2285,6 +2848,11 @@ function renderHrList() {
         </tr>`).join('')}
       </tbody>
     </table></div>`;
+}
+
+function setHrFilter(bonbu) {
+  hrFilterBonbu = bonbu;
+  renderHrList();
 }
 
 // ── HR 개인 상세 카드 ──
@@ -2576,13 +3144,6 @@ function showHrDetail(encSabun, encName) {
               }).join('')}
             </tbody>
           </table>
-          <!-- 직책종합평가등급 -->
-          <div style="margin-top:10px;padding:10px 12px;background:var(--surface);border-radius:7px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:11px;color:var(--text-muted);font-weight:700">25년 직책종합평가등급</span>
-            <span style="font-size:15px;font-weight:800;color:${(()=>{const g=info?(info['직책종합평가등급(25년)']||'-'):'-';return g==='S'?'#c62828':g==='A'?'#1565c0':g==='B'?'#2e7d32':'var(--text)'})()}">
-              ${info?(info['직책종합평가등급(25년)']||'-'):'-'}
-            </span>
-          </div>
         </div>
 
         <!-- 직책평가 -->
@@ -2595,17 +3156,19 @@ function showHrDetail(encSabun, encName) {
               <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">2분기</th>
               <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">3분기</th>
               <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">4분기</th>
+              <th style="background:#e8f0fe;padding:7px 8px;border:1px solid var(--border);text-align:center">종합등급</th>
             </tr></thead>
             <tbody>
-              <!-- 24년: 1~3분기 병합 "연 1회 시행(4분기)" -->
+              <!-- 24년 -->
               <tr>
                 <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700">24년</td>
                 <td colspan="3" style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-size:10px;color:var(--text-muted);background:#f8f9fc">연 1회 시행 (4분기)</td>
                 <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700;color:var(--primary)">
                   ${info?(info['직책평가_24년4분기']||'-'):'-'}
                 </td>
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-size:10px;color:var(--text-muted);background:#f8f9fc">-</td>
               </tr>
-              <!-- 25년: 1분기 미시행 -->
+              <!-- 25년 -->
               <tr>
                 <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700">25년</td>
                 <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-size:10px;color:var(--text-muted);background:#f8f9fc">미시행</td>
@@ -2613,8 +3176,11 @@ function showHrDetail(encSabun, encName) {
                   const v = info?(info[`직책평가_${q}`]||'-'):'-';
                   return `<td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700;color:var(--primary)">${v}</td>`;
                 }).join('')}
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700;color:${(()=>{const g=info?(info['직책종합평가등급(25년)']||'-'):'-';return g==='S'?'#c62828':g==='A'?'#1565c0':g==='B'?'#2e7d32':'var(--text)'})()}">
+                  ${info?(info['직책종합평가등급(25년)']||'-'):'-'}
+                </td>
               </tr>
-              <!-- 26년: 1분기만, 나머지 진행 예정 -->
+              <!-- 26년 -->
               <tr>
                 <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700">26년</td>
                 <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-weight:700;color:var(--primary)">
@@ -2623,6 +3189,7 @@ function showHrDetail(encSabun, encName) {
                 ${[2,3,4].map(q=>`
                   <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-size:10px;color:var(--text-muted);background:#f8f9fc">예정</td>
                 `).join('')}
+                <td style="padding:7px 8px;border:1px solid var(--border);text-align:center;font-size:10px;color:var(--text-muted);background:#f8f9fc">예정</td>
               </tr>
             </tbody>
           </table>
@@ -2640,6 +3207,103 @@ function showHrDetail(encSabun, encName) {
     </div>
 
     <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+    <!-- 리더십 역량 -->
+    <div style="margin-bottom:20px" id="leadership-section-${safeKey}">
+      <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:14px">⭐ 리더십 역량</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+        <!-- ── 좌: 직무수행능력 ── -->
+        <div style="background:var(--bg);border-radius:10px;padding:14px;border:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:700;color:var(--primary-light);margin-bottom:10px">직무수행능력</div>
+
+          <!-- 년도 선택 -->
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--text-muted)">년도:</span>
+            ${[2024,2025,2026].map(y=>`
+              <button id="radar-year-btn-${safeKey}-${y}"
+                onclick="selectRadarYear('${safeKey}','${sabun}','${name}',${y})"
+                style="padding:3px 10px;border-radius:20px;border:1.5px solid var(--border);
+                background:var(--bg);color:var(--text-muted);font-size:11px;font-weight:600;
+                cursor:pointer;font-family:inherit;transition:all .15s">${y}년</button>`).join('')}
+          </div>
+
+          <!-- 분기 토글 (년도 없이) -->
+          <div style="display:flex;gap:5px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--text-muted)">분기:</span>
+            ${['Q1','Q2','Q3','Q4'].map((q,i)=>{
+              const qColor=['#3266AD','#2E7D32','#E65100','#6A1B9A'][i];
+              return `<button id="radar-btn-${safeKey}-${q}"
+                onclick="toggleRadarQuarter('${safeKey}','${q}','${sabun}','${name}')"
+                style="padding:3px 10px;border-radius:20px;border:2px solid ${qColor};
+                background:var(--bg);color:var(--text-muted);font-size:11px;font-weight:600;
+                cursor:pointer;font-family:inherit;transition:all .15s"
+                data-active="false" data-color="${qColor}" data-quarter="${q}">${i+1}분기</button>`;
+            }).join('')}
+            <button onclick="toggleAllRadar('${safeKey}','${sabun}','${name}')"
+              style="padding:3px 10px;border-radius:20px;border:1.5px solid var(--primary);
+              background:var(--primary);color:#fff;font-size:11px;font-weight:600;
+              cursor:pointer;font-family:inherit">전체</button>
+          </div>
+
+          <!-- 레이더 차트 + 점수 나란히 -->
+          <div style="display:flex;gap:16px;align-items:flex-start">
+            <!-- 좌: 레이더 차트 (더 크게) -->
+            <div style="flex:0 0 220px">
+              <svg id="radar-svg-${safeKey}" viewBox="-20 -20 380 380" style="width:100%;max-width:230px;display:block">
+                <g transform="translate(170,170)">
+                  ${[30,60,90,120,150].map((r,i)=>`
+                    <polygon points="${radarPoly(r)}" fill="none"
+                      stroke="${i===4?'#aab':'#dde'}" stroke-width="${i===4?'0.8':'0.5'}"/>`).join('')}
+                  ${[0,1,2,3,4].map(i=>{
+                    const a=(i*72-90)*Math.PI/180;
+                    return `<line x1="0" y1="0" x2="${Math.cos(a)*150}" y2="${Math.sin(a)*150}" stroke="#dde" stroke-width="0.5"/>`;
+                  }).join('')}
+                  ${getEvalItems(activeQuarter.year, info ? (info['본부']||info['지점']||'') : '').map((label,i)=>{
+                    const a=(i*72-90)*Math.PI/180;
+                    const x=Math.cos(a)*175; const y=Math.sin(a)*175;
+                    return `<text id="radar-label-${safeKey}-${i}" x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7a8d">${label}</text>`;
+                  }).join('')}
+                  <g id="radar-layers-${safeKey}"></g>
+                </g>
+              </svg>
+              <div id="radar-legend-${safeKey}" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px"></div>
+            </div>
+            <!-- 우: 점수 + 역량분석 (촘촘하게) -->
+            <div style="flex:1;min-width:0">
+              <div id="radar-score-panel-${safeKey}">
+                <div style="padding:12px;text-align:center;color:var(--text-muted);font-size:12px">
+                  년도와 분기를 선택하세요
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 우: 부서장 서술 ── -->
+        <div style="background:var(--bg);border-radius:10px;padding:14px;border:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:700;color:var(--primary-light);margin-bottom:10px">부서장 서술</div>
+
+          <!-- 년도 선택 -->
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--text-muted)">년도:</span>
+            ${[2024,2025,2026].map(y=>`
+              <button id="comment-year-btn-${safeKey}-${y}"
+                onclick="selectCommentYear('${safeKey}','${sabun}','${name}',${y})"
+                style="padding:3px 10px;border-radius:20px;border:1.5px solid var(--border);
+                background:var(--bg);color:var(--text-muted);font-size:11px;font-weight:600;
+                cursor:pointer;font-family:inherit;transition:all .15s">${y}년</button>`).join('')}
+          </div>
+
+          <!-- 서술 목록 -->
+          <div id="comment-list-${safeKey}">
+            <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px">년도를 선택하세요</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
 
     <!-- 교육 이력 -->
     <div style="margin-bottom:20px">${eduTable()}</div>
@@ -2679,8 +3343,6 @@ function showHrDetail(encSabun, encName) {
   wrap.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <button class="btn btn-outline btn-sm" onclick="showPage('hr-list')">← 목록으로</button>
-      <span style="font-size:17px;font-weight:800;color:var(--primary)">${name}</span>
-      ${sabun?`<span class="badge badge-blue">사번: ${sabun}</span>`:''}
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px">
       ${basicInfoContent()}
@@ -2953,6 +3615,416 @@ function historyExcelUpload(e, key) {
     }catch(err){showToast('오류: '+err.message);}
   };
   reader.readAsBinaryString(file); e.target.value='';
+}
+
+// 현재 선택된 년도 상태
+const radarSelectedYear = {};   // { safeKey: year }
+const commentSelectedYear = {}; // { safeKey: year }
+
+// 직무수행능력 년도 선택
+function selectRadarYear(safeKey, sabun, name, year) {
+  radarSelectedYear[safeKey] = year;
+  [2024,2025,2026].forEach(y => {
+    const btn = document.getElementById(`radar-year-btn-${safeKey}-${y}`);
+    if (!btn) return;
+    btn.style.background = y===year ? 'var(--primary)' : 'var(--bg)';
+    btn.style.color = y===year ? '#fff' : 'var(--text-muted)';
+    btn.style.borderColor = y===year ? 'var(--primary)' : 'var(--border)';
+  });
+
+  // 분기 버튼 모두 리셋
+  if (!radarActiveQuarters[safeKey]) radarActiveQuarters[safeKey] = {Q1:false,Q2:false,Q3:false,Q4:false};
+  ['Q1','Q2','Q3','Q4'].forEach(q => {
+    radarActiveQuarters[safeKey][q] = false;
+    const btn = document.getElementById(`radar-btn-${safeKey}-${q}`);
+    if (btn) { btn.style.background='var(--bg)'; btn.style.color='var(--text-muted)'; }
+  });
+
+  const layers = document.getElementById(`radar-layers-${safeKey}`);
+  if (layers) layers.innerHTML = '';
+  const legend = document.getElementById(`radar-legend-${safeKey}`);
+  if (legend) legend.innerHTML = '';
+  const scorePanel = document.getElementById(`radar-score-panel-${safeKey}`);
+
+  // 24년 미시행
+  if (year === 2024) {
+    if (scorePanel) scorePanel.innerHTML = `
+      <div style="padding:16px;text-align:center;background:#f8f9fc;border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:4px">미시행</div>
+        <div style="font-size:12px;color:var(--text-muted)">2024년은 직무수행능력 평가가 시행되지 않았습니다.</div>
+      </div>`;
+    // 분기 버튼 비활성화
+    ['Q1','Q2','Q3','Q4'].forEach(q => {
+      const btn = document.getElementById(`radar-btn-${safeKey}-${q}`);
+      if (btn) { btn.style.opacity='0.35'; btn.style.pointerEvents='none'; }
+    });
+    return;
+  }
+
+  // 다른 년도 분기 버튼 활성화
+  ['Q1','Q2','Q3','Q4'].forEach(q => {
+    const btn = document.getElementById(`radar-btn-${safeKey}-${q}`);
+    if (btn) { btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
+  });
+
+  if (scorePanel) scorePanel.innerHTML = `<div style="padding:12px;text-align:center;color:var(--text-muted);font-size:12px">분기를 선택하세요</div>`;
+  ['Q1','Q2','Q3','Q4'].forEach(q => { delete radarDataCache[`${safeKey}_${q}`]; });
+}
+
+// 부서장 서술 년도 선택
+// 년도별 부서장 평가 기준 (소속별 추후 확장 예정)
+// ══ 평가 항목 정의 (년도/소속별) ══
+const EVAL_ITEMS = {
+  2025: {
+    default: ['리더십','조직운영','소통','성과관리','업무유연성']
+  },
+  2026: {
+    'CFO':                      ['동기부여','코칭','소통 및 공감','책임감','대외협업력'],
+    'O2O플랫폼사업본부':        ['동기부여','코칭','소통 및 공감','책임감','성과창출력'],
+    'O2O플랫폼사업본부(본)':    ['동기부여','코칭','소통 및 공감','책임감','성과창출력'],
+    '퍼블리싱사업본부':         ['동기부여','코칭','소통 및 공감','전략적사고','조직관리능력'],
+    '교육평가연구소':           ['동기부여','코칭','소통 및 공감','책임감','대외협업력'],
+    '사업지원본부':             ['동기부여','코칭','소통 및 공감','변화대응력','자원최적화능력'],
+    'ECI':                      ['동기부여','코칭','소통 및 공감','업무추진(실행)력','성과관리력'],
+    'ECI(본)':                  ['동기부여','코칭','소통 및 공감','업무추진(실행)력','성과관리력'],
+    '강남하이퍼학원 본원의대관':['동기부여','코칭','소통 및 공감','업무추진(실행)력','공정성/객관성'],
+    '강남하이퍼기숙학원의대관': ['동기부여','코칭','소통 및 공감','책임감','조직관리능력'],
+    '강북청솔학원':             ['동기부여','코칭','소통 및 공감','문제해결력','조직관리능력'],
+    '부천청솔학원':             ['동기부여','코칭','소통 및 공감','업무추진(실행)력','자원최적화능력'],
+    '분당청솔학원':             ['동기부여','코칭','소통 및 공감','업무추진(실행)력','조직관리능력'],
+    '일산청솔학원':             ['동기부여','코칭','소통 및 공감','업무추진(실행)력','성과창출력'],
+    '일산청솔학원네오관':       ['동기부여','코칭','소통 및 공감','업무추진(실행)력','성과창출력'],
+    '평촌청솔학원':             ['동기부여','코칭','소통 및 공감','업무기획력','성과창출력'],
+    '이천기숙학원':             ['동기부여','코칭','소통 및 공감','책임감','성과관리력'],
+    '독학기숙학원':             ['동기부여','코칭','소통 및 공감','변화대응력','조직관리능력'],
+    '대치점':                   ['동기부여','코칭','소통 및 공감','책임감','위기관리력'],
+    '강남점':                   ['동기부여','코칭','소통 및 공감','책임감','위기관리력'],
+    '온라인사업본부':           ['동기부여','코칭','소통 및 공감','직무전문성','조직관리능력'],
+    '강남하이퍼학원목동관':     ['동기부여','코칭','소통 및 공감','업무추진(실행)력','정보전달력'],
+    '이투스기숙학원':           ['동기부여','코칭','소통 및 공감','직무전문성','조직관리능력'],
+    default:                    ['동기부여','코칭','소통 및 공감','조직기여','혁신성']
+  }
+};
+
+function getEvalItems(year, bonbu) {
+  const yearData = EVAL_ITEMS[Number(year)];
+  if (!yearData) return ['항목1','항목2','항목3','항목4','항목5'];
+  if (!bonbu) return yearData.default || ['항목1','항목2','항목3','항목4','항목5'];
+  const key = Object.keys(yearData).find(k =>
+    k !== 'default' && (bonbu.includes(k) || k.includes(bonbu))
+  );
+  return (key ? yearData[key] : yearData.default) || ['항목1','항목2','항목3','항목4','항목5'];
+}
+
+const EVAL_CRITERIA = {
+  2024: null, // 미시행
+  2025: '전략 정합성 및 목표 연계성에 기반한 문제 해결 및 리스크 관리 능력',
+  2026: '문제 해결력에 대한 리더십으로 구성원의 정성적 노력을 객관적인 비즈니스 임팩트로 연결하는 것이 리더의 본질적인 역할로, 장애물을 식별하는 데 그치지 않고 근본적인 해결 방안을 도출하여 가시적인 변화를 만들어내는 과정에 대한 평가를 합니다.',
+};
+
+async function selectCommentYear(safeKey, sabun, name, year) {
+  commentSelectedYear[safeKey] = year;
+  [2024,2025,2026].forEach(y => {
+    const btn = document.getElementById(`comment-year-btn-${safeKey}-${y}`);
+    if (!btn) return;
+    btn.style.background = y===year ? 'var(--primary)' : 'var(--bg)';
+    btn.style.color = y===year ? '#fff' : 'var(--text-muted)';
+    btn.style.borderColor = y===year ? 'var(--primary)' : 'var(--border)';
+  });
+  const listEl = document.getElementById(`comment-list-${safeKey}`);
+  if (!listEl) return;
+
+  // 24년 미시행 처리
+  if (year === 2024) {
+    listEl.innerHTML = `
+      <div style="padding:16px;text-align:center;background:#f8f9fc;border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:4px">미시행</div>
+        <div style="font-size:12px;color:var(--text-muted)">2024년은 부서장 서술 평가가 시행되지 않았습니다.</div>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-muted);font-size:12px">불러오는 중...</div>';
+
+  // 평가 기준 텍스트
+  const criteria = EVAL_CRITERIA[year];
+  const criteriaHtml = criteria ? `
+    <div style="margin-bottom:12px;padding:10px 14px;background:#eef4fb;border-radius:8px;
+      border-left:3px solid var(--primary-light)">
+      <div style="font-size:10px;font-weight:700;color:var(--primary-light);margin-bottom:4px;letter-spacing:0.5px">
+        📌 ${year}년 평가 기준
+      </div>
+      <div style="font-size:12px;color:var(--text);line-height:1.7">${criteria}</div>
+    </div>` : '';
+
+  const COLORS = ['#3266AD','#2E7D32','#E65100','#6A1B9A'];
+  const person = persons.find(p => (sabun && p.sabun===sabun) || p.name===name);
+  let html = criteriaHtml;
+
+  for (let i=0; i<4; i++) {
+    const q = ['Q1','Q2','Q3','Q4'][i];
+    const docKey = `eval_${year}_${q}`;
+    const color = COLORS[i];
+    const bodyId = `cmt-body-${safeKey}-${year}-${q}`;
+    const arrowId = `cmt-arrow-${safeKey}-${year}-${q}`;
+
+    let comment = '';
+    if (person) {
+      try {
+        const doc = await db.collection('evalData').doc(docKey).get();
+        const qData = doc.exists ? doc.data().data : {};
+        const d = qData[person.no];
+        comment = d ? (d.comment||'') : '';
+      } catch(e) {
+        const qData = JSON.parse(localStorage.getItem(docKey)||'{}');
+        const d = person ? qData[person.no] : null;
+        comment = d ? (d.comment||'') : '';
+      }
+    }
+
+    const preview = comment ? (comment.length>50 ? comment.slice(0,50)+'...' : comment) : '서술 평가 없음';
+    html += `
+    <div style="margin-bottom:8px;border-radius:8px;overflow:hidden;border:1px solid ${color}33">
+      <div onclick="toggleComment('${bodyId}','${arrowId}')"
+        style="display:flex;align-items:center;justify-content:space-between;
+        padding:10px 14px;background:${color}11;cursor:pointer">
+        <span style="font-size:12px;font-weight:700;color:${color}">${i+1}분기</span>
+        <div style="display:flex;align-items:center;gap:8px;flex:1;margin-left:12px;overflow:hidden">
+          <span style="font-size:11px;color:var(--text-muted);flex:1;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${preview}</span>
+          <span id="${arrowId}" style="font-size:12px;color:${color};transition:transform .2s;flex-shrink:0">▼</span>
+        </div>
+      </div>
+      <div id="${bodyId}" style="display:none;padding:12px 16px;font-size:12px;
+        color:var(--text);line-height:1.8;border-top:1px solid ${color}22;background:var(--surface)">
+        ${comment || '<span style="color:var(--text-muted)">해당 분기 서술 평가가 없습니다.</span>'}
+      </div>
+    </div>`;
+  }
+  listEl.innerHTML = html;
+}
+
+// ══ 접속 현황 대시보드 ══
+let dashChart = null;
+
+const DASH_DATA = {
+  q1:  { labels: ['1/1','1/2','1/3','1/4','1/5','1/6','1/7','1/8','1/9','1/10','1/11','1/12','1/13'],
+         access: [5,8,15,14,16,12,17,11,14,13,7,15,10],
+         eval:   [2,3,7,5,8,4,9,5,7,4,3,8,4] },
+  q2:  { labels: ['3/1','3/2','3/3','3/4','3/5','3/6','3/7','3/8','3/9','3/10','3/11','3/12','3/13'],
+         access: [7,10,13,12,15,11,14,10,12,9,11,13,12],
+         eval:   [3,5,8,6,9,5,7,4,6,3,5,7,6] },
+  all: { labels: ['3.12','3.13','3.14','3.15','3.16','3.17','3.18','3.19','3.20','3.21','3.22','3.23','3.24','3.25'],
+         access: [5,8,15,14,16,12,17,11,14,13,7,15,10,12],
+         eval:   null }
+};
+
+function initDashboard() {
+  setTimeout(() => { switchDashPeriod('q1'); }, 100);
+}
+
+function switchDashPeriod(period) {
+  ['q1','q2','all'].forEach(p => {
+    const btn = document.getElementById('dash-btn-'+p);
+    if (!btn) return;
+    btn.className = p===period ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  });
+
+  const d = DASH_DATA[period];
+  const canvas = document.getElementById('dash-line-chart');
+  if (!canvas) return;
+
+  const datasets = [
+    { label:'접속자', data:d.access, borderColor:'#3266AD', backgroundColor:'#3266AD18', tension:0.3, pointRadius:3, fill:true }
+  ];
+  if (d.eval) {
+    datasets.push({ label:'평가입력', data:d.eval, borderColor:'#2E7D32', backgroundColor:'#2E7D3218', tension:0.3, pointRadius:3, fill:true });
+  }
+
+  if (dashChart) { dashChart.destroy(); dashChart = null; }
+  dashChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels: d.labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#88878018' }, ticks: { font: { size: 10 }, color: '#888780' } },
+        y: { grid: { color: '#88878018' }, ticks: { font: { size: 10 }, color: '#888780' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+
+function gradeToScore(g) {
+  return {S:6, A:5, B:4, C:3, D:2, E:1}[g]||0;
+}
+function radarPoly(r, scores) {
+  if (!scores) {
+    return [0,1,2,3,4].map(i=>{const a=(i*72-90)*Math.PI/180;return `${Math.cos(a)*r},${Math.sin(a)*r}`;}).join(' ');
+  }
+  return scores.map((s,i)=>{const a=(i*72-90)*Math.PI/180;const r2=(s/7)*140;return `${Math.cos(a)*r2},${Math.sin(a)*r2}`;}).join(' ');
+}
+const radarActiveQuarters={};
+const radarDataCache={};
+
+async function toggleRadarQuarter(safeKey,q,sabun,name){
+  if(!radarActiveQuarters[safeKey]) radarActiveQuarters[safeKey]={Q1:false,Q2:false,Q3:false,Q4:false};
+  radarActiveQuarters[safeKey][q]=!radarActiveQuarters[safeKey][q];
+  const btn=document.getElementById(`radar-btn-${safeKey}-${q}`);
+  if(btn){const active=radarActiveQuarters[safeKey][q];btn.style.background=active?btn.dataset.color:'var(--bg)';btn.style.color=active?'#fff':'var(--text-muted)';btn.dataset.active=active;}
+  await renderRadar(safeKey,sabun,name);
+}
+async function toggleAllRadar(safeKey,sabun,name){
+  if(!radarActiveQuarters[safeKey]) radarActiveQuarters[safeKey]={Q1:false,Q2:false,Q3:false,Q4:false};
+  const anyOn=Object.values(radarActiveQuarters[safeKey]).some(v=>v);
+  ['Q1','Q2','Q3','Q4'].forEach(q=>{
+    radarActiveQuarters[safeKey][q]=!anyOn;
+    const btn=document.getElementById(`radar-btn-${safeKey}-${q}`);
+    if(btn){btn.style.background=!anyOn?btn.dataset.color:'var(--bg)';btn.style.color=!anyOn?'#fff':'var(--text-muted)';}
+  });
+  await renderRadar(safeKey,sabun,name);
+}
+
+async function renderRadar(safeKey,sabun,name){
+  const COLORS={Q1:'#3266AD',Q2:'#2E7D32',Q3:'#E65100',Q4:'#6A1B9A'};
+  const LABELS={Q1:'1분기',Q2:'2분기',Q3:'3분기',Q4:'4분기'};
+  const active=radarActiveQuarters[safeKey]||{};
+  const year=radarSelectedYear[safeKey]||activeQuarter.year;
+  const layers=document.getElementById(`radar-layers-${safeKey}`);
+  const legend=document.getElementById(`radar-legend-${safeKey}`);
+  const scorePanel=document.getElementById(`radar-score-panel-${safeKey}`);
+  if(!layers) return;
+
+  // 년도 미선택 안내
+  if(!radarSelectedYear[safeKey]){
+    if(scorePanel) scorePanel.innerHTML=`<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px">년도를 먼저 선택하세요</div>`;
+    return;
+  }
+
+  const dataMap={};
+  for(const q of ['Q1','Q2','Q3','Q4']){
+    if(!active[q]) continue;
+    const cKey=`${safeKey}_${q}`;
+    if(!radarDataCache[cKey]){
+      const docKey=`eval_${year}_${q}`;
+      try{const doc=await db.collection('evalData').doc(docKey).get();radarDataCache[cKey]=doc.exists?doc.data().data:{};}
+      catch(e){radarDataCache[cKey]=JSON.parse(localStorage.getItem(docKey)||'{}');}
+    }
+    dataMap[q]=radarDataCache[cKey];
+  }
+
+  function findPerson(qData){
+    if(!qData) return null;
+    const p=persons.find(p=>(sabun&&p.sabun===sabun)||p.name===name);
+    return p?(qData[p.no]||null):null;
+  }
+
+  layers.innerHTML='';
+  const activeLegends=[];
+  let lastData=null,lastQ=null;
+
+  // 소속 가져오기 (hrPersons에서)
+  const hrP = hrPersons.find(p=>(sabun&&(p['사번']||'').trim()===sabun)||(p['이름']||p['성명']||'').trim()===name);
+  const bonbu = hrP ? (hrP['본부']||hrP['지점']||'') : '';
+  const ITEMS = getEvalItems(year, bonbu);
+
+  // 레이더 레이블 업데이트
+  ITEMS.forEach((label,i)=>{
+    const el=document.getElementById(`radar-label-${safeKey}-${i}`);
+    if(el) el.textContent=label;
+  });
+
+  for(const q of ['Q1','Q2','Q3','Q4']){
+    if(!active[q]) continue;
+    const d=findPerson(dataMap[q]);
+    if(!d) continue;
+    // 점수: 숫자면 직접 사용, 등급이면 변환
+    function toNum(v){ const n=Number(v); return (!isNaN(n)&&n>0) ? n : gradeToScore(v)*100/6; }
+    const scores=[toNum(d.g1),toNum(d.g2),toNum(d.g3),toNum(d.g4),toNum(d.g5)];
+    const maxScore=100;
+    const color=COLORS[q];
+    const pts=scores.map((s,i)=>{const a=(i*72-90)*Math.PI/180;const r2=(s/maxScore)*150;return `${Math.cos(a)*r2},${Math.sin(a)*r2}`;}).join(' ');
+    layers.innerHTML+=`<polygon points="${pts}" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+    ${scores.map((s,i)=>{const a=(i*72-90)*Math.PI/180;const r2=(s/maxScore)*150;return `<circle cx="${Math.cos(a)*r2}" cy="${Math.sin(a)*r2}" r="3.5" fill="${color}" opacity="0.85"/>`;}).join('')}`;
+    activeLegends.push({q,color,label:LABELS[q]});
+    lastData=d; lastQ=q;
+  }
+
+  if(legend) legend.innerHTML=activeLegends.map(({color,label})=>
+    `<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:9px;height:9px;border-radius:2px;background:${color};display:inline-block"></span><span style="font-size:11px;color:var(--text-muted)">${label}</span></span>`
+  ).join('');
+
+  if(!lastData){
+    if(scorePanel) scorePanel.innerHTML=`<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px">분기 버튼을 클릭해서 역량을 확인하세요</div>`;
+    return;
+  }
+
+  const grades=[lastData.g1,lastData.g2,lastData.g3,lastData.g4,lastData.g5];
+  function toNum(v){ const n=Number(v); return (!isNaN(n)&&n>0) ? n : gradeToScore(v)*100/6; }
+  const scores5=grades.map(toNum);
+  const avg=scores5.filter(s=>s>0).reduce((a,b)=>a+b,0)/(scores5.filter(s=>s>0).length||1);
+  const maxIdx=scores5.indexOf(Math.max(...scores5));
+  const minIdx=scores5.indexOf(Math.min(...scores5.filter(s=>s>0)));
+  const color=COLORS[lastQ];
+
+  if(scorePanel) scorePanel.innerHTML=`
+    <div style="background:var(--surface);border-radius:8px;padding:10px 12px;border:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid var(--border)">${year}년 ${LABELS[lastQ]} 평가</div>
+      ${ITEMS.map((item,i)=>{
+        const rawVal = grades[i]||'-';
+        const numVal = scores5[i];
+        const dispVal = numVal>0 ? Math.round(numVal)+'점' : rawVal;
+        const dispColor = numVal>=90?'#c62828':numVal>=80?'#1565c0':numVal>=70?'#2e7d32':'var(--text)';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;${i<4?'border-bottom:1px solid #f0f2f5':''}">
+          <span style="font-size:12px;color:var(--text-muted)">${item}</span>
+          <span style="font-size:12px;font-weight:700;color:${dispColor}">${dispVal}</span>
+        </div>`;
+      }).join('')}
+      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:5px;border-top:2px solid ${color}33">
+        <span style="font-size:11px;color:var(--text-muted)">평균</span>
+        <span style="font-size:13px;font-weight:800;color:${color}">${Math.round(avg)}점</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding-top:5px;border-top:1px solid var(--border);flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text-muted)">강점</span>
+        <span style="padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;font-size:11px;font-weight:700">${ITEMS[maxIdx]}</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:2px">보완</span>
+        <span style="padding:2px 8px;border-radius:10px;background:#fff3e0;color:#e65100;font-size:11px;font-weight:700">${ITEMS[minIdx]||'-'}</span>
+      </div>
+    </div>`;
+
+  loadRadarComments(safeKey,sabun,name);
+}
+
+async function loadRadarComments(safeKey,sabun,name){
+  const person=persons.find(p=>(sabun&&p.sabun===sabun)||p.name===name);
+  if(!person) return;
+  for(let i=0;i<4;i++){
+    const q=['Q1','Q2','Q3','Q4'][i];
+    const docKey=`eval_${activeQuarter.year}_${q}`;
+    const previewEl=document.getElementById(`comment-${safeKey}-${i}-preview`);
+    const bodyEl=document.getElementById(`comment-body-${safeKey}-${i}`);
+    if(!previewEl||!bodyEl) continue;
+    let qData=radarDataCache[`${safeKey}_${q}`];
+    if(!qData){
+      try{const doc=await db.collection('evalData').doc(docKey).get();qData=doc.exists?doc.data().data:{};radarDataCache[`${safeKey}_${q}`]=qData;}
+      catch(e){qData=JSON.parse(localStorage.getItem(docKey)||'{}');}
+    }
+    const d=qData[person.no];
+    const comment=d?(d.comment||''):'';
+    if(!comment){previewEl.textContent='서술 평가 없음';bodyEl.innerHTML='<span style="color:var(--text-muted)">해당 분기 서술 평가가 없습니다.</span>';}
+    else{previewEl.textContent=comment.length>40?comment.slice(0,40)+'...':comment;bodyEl.textContent=comment;}
+  }
+}
+
+function toggleComment(bodyId,arrowId){
+  const body=document.getElementById(bodyId);
+  const arrow=document.getElementById(arrowId);
+  if(!body) return;
+  const open=body.style.display==='none';
+  body.style.display=open?'block':'none';
+  if(arrow) arrow.style.transform=open?'rotate(180deg)':'';
 }
 
 // ── 근태 아코디언 ──

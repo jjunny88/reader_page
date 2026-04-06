@@ -526,6 +526,7 @@ function initApp() {
     {page:'overview',   icon:'📋', label:'직책자 현황'},
     {page:'result',     icon:'📊', label:'전체 평가 결과'},
     {page:'dashboard',  icon:'📡', label:'접속 현황'},
+    {page:'eval-analysis', icon:'📈', label:'평가 분석'},
     {section:'인사현황'},
     {page:'hr-list',    icon:'👤', label:'인적사항 목록'},
     {page:'hr-upload',  icon:'📂', label:'인사 데이터 업로드'},
@@ -761,6 +762,151 @@ function buildAdminPages() {
         </table></div>
       </div>
     </div>
+  </div>
+
+  <!-- Eval Analysis Dashboard -->
+  <div class="page" id="page-eval-analysis">
+    <!-- 헤더 + 필터 -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--text)">평가 분석 대시보드</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px" id="ea-filter-desc">2026년 · 전체 분기 · 전체 본부 · 전체 직책</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="ea-year" class="form-input" style="padding:5px 10px;font-size:12px" onchange="renderEvalAnalysis()">
+          <option value="2026" selected>2026년</option>
+          <option value="2025">2025년</option>
+          <option value="all">전체</option>
+        </select>
+        <select id="ea-quarter" class="form-input" style="padding:5px 10px;font-size:12px" onchange="renderEvalAnalysis()">
+          <option value="all" selected>전체 분기</option>
+          <option value="1">1분기</option>
+          <option value="2">2분기</option>
+          <option value="3">3분기</option>
+          <option value="4">4분기</option>
+        </select>
+        <select id="ea-bonbu" class="form-input" style="padding:5px 10px;font-size:12px" onchange="renderEvalAnalysis()">
+          <option value="all" selected>전체 본부</option>
+          <option value="사업지원본부">사업지원본부</option>
+          <option value="O2O플랫폼사업본부">O2O플랫폼사업본부</option>
+          <option value="퍼블리싱사업본부">퍼블리싱사업본부</option>
+          <option value="ECI">ECI</option>
+          <option value="청솔계열">청솔계열</option>
+        </select>
+        <select id="ea-jikchek" class="form-input" style="padding:5px 10px;font-size:12px" onchange="renderEvalAnalysis()">
+          <option value="all" selected>전체 직책</option>
+          <option value="실장">실장</option>
+          <option value="팀장">팀장</option>
+        </select>
+        <div style="font-size:10px;color:var(--text-muted);padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px">📌 더미 데이터</div>
+      </div>
+    </div>
+
+    <!-- 요약 카드 4개 -->
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px">
+      <div class="stat-card"><div class="stat-label">평가 대상</div><div class="stat-val" id="ea-s-total">-</div><div class="stat-sub">전체 직책자</div></div>
+      <div class="stat-card"><div class="stat-label">평균 점수</div><div class="stat-val" id="ea-s-avg" style="color:var(--primary)">-</div><div class="stat-sub" id="ea-s-diff">-</div></div>
+      <div class="stat-card"><div class="stat-label">인센티브 지급</div><div class="stat-val" id="ea-s-incentive" style="color:var(--accent)">-</div><div class="stat-sub" id="ea-s-inc-pct">-</div></div>
+      <div class="stat-card"><div class="stat-label">최고 본부</div><div class="stat-val" id="ea-s-best" style="color:var(--success);font-size:14px;margin-top:4px">-</div><div class="stat-sub" id="ea-s-best-score">-</div></div>
+    </div>
+
+    <!-- 추이 라인 차트 -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <span class="card-title" id="ea-trend-title">분기별 평균 점수 추이 — 전체 본부</span>
+        <div style="display:flex;gap:12px;flex-wrap:wrap" id="ea-trend-legend"></div>
+      </div>
+      <div style="position:relative;height:230px"><canvas id="ea-trendChart"></canvas></div>
+    </div>
+
+    <!-- 하단 2x2 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <!-- 등급 분포 -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:10px">등급 분포</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px" id="ea-grade-badges"></div>
+        <div style="position:relative;height:175px"><canvas id="ea-donutChart"></canvas></div>
+      </div>
+
+      <!-- 본부별 평균 -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:10px">본부별 평균 점수</div>
+        <div style="position:relative;height:205px"><canvas id="ea-barChart"></canvas></div>
+      </div>
+
+      <!-- 역량 레이더 -->
+      <div class="card">
+        <div class="card-title" id="ea-radar-title" style="margin-bottom:10px">역량 항목별 평균</div>
+        <div style="position:relative;height:205px"><canvas id="ea-radarChart"></canvas></div>
+      </div>
+
+      <!-- 직책년차별 -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:10px">직책년차별 평균 점수</div>
+        <div style="position:relative;height:160px"><canvas id="ea-nyeonChart"></canvas></div>
+        <div style="margin-top:10px;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600">인센티브 지급 기준</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#e8f5e9;color:#2e7d32;font-weight:600">1~2년차 · B이상</span>
+            <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#e3f2fd;color:#1565c0;font-weight:600">3년차↑ · A이상</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 구분선: 부서장 서술 분석 -->
+    <div style="display:flex;align-items:center;gap:10px;margin:20px 0 14px">
+      <div style="width:4px;height:20px;background:#6A1B9A;border-radius:2px"></div>
+      <span style="font-size:15px;font-weight:700;color:var(--text)">부서장 서술 분석</span>
+      <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#f3e8ff;color:#6A1B9A;font-weight:600">📌 더미 데이터</span>
+    </div>
+
+    <!-- 부서장별 일치도 + 서술 성실도 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px">연초 방향 vs 실제 서술 일치도</div>
+        <div id="ea-consistency-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:10px">서술 성실도 (평균 글자 수)</div>
+        <div style="position:relative;height:160px"><canvas id="ea-lenChart"></canvas></div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text-muted);padding:6px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+          권장 작성량: <strong>100자 이상</strong> · 미달 시 빨간색 표시
+        </div>
+      </div>
+    </div>
+
+    <!-- 부서장 상세 분석 -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="card-title">분기별 서술 상세 분석</span>
+          <select id="ea-person-sel" class="form-input" style="padding:4px 8px;font-size:12px" onchange="renderCommentDetail()">
+            <option value="이문성">이문성 부서장</option>
+            <option value="정미상">정미상 부서장</option>
+            <option value="박종박">박종박 부서장</option>
+          </select>
+        </div>
+        <span id="ea-avg-match-badge" style="font-size:11px;padding:3px 12px;border-radius:20px;background:#e8f5e9;color:#2e7d32;font-weight:600">평균 일치도 82%</span>
+      </div>
+      <!-- 연초 방향 -->
+      <div id="ea-dir-box" style="border-radius:8px;padding:12px;margin-bottom:14px;border-left:3px solid #6A1B9A;background:var(--bg)"></div>
+      <!-- 분기별 그리드 -->
+      <div id="ea-quarter-grid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px"></div>
+    </div>
+
+    <!-- 역량 키워드 빈도 + 본부별 강점/보완 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:10px">역량 키워드 언급 빈도</div>
+        <div style="position:relative;height:200px"><canvas id="ea-keywordChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px">본부별 강점 · 보완 역량</div>
+        <div id="ea-bonbu-tags"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Result -->
@@ -1238,6 +1384,7 @@ function showPage(name) {
     'my-overview':'담당 직책자 현황', 'eval':'평가 입력',
     'my-dashboard':'내 평가 결과',
     'hr-list':'인적사항 목록', 'hr-upload':'인사 데이터 업로드', 'hr-detail':'개인 상세 카드',
+    'dashboard':'접속 현황', 'eval-analysis':'평가 분석',
   };
   document.getElementById('topbar-title').textContent = titles[name] || name;
   // topbar-sub는 소속 유지
@@ -1248,6 +1395,7 @@ function showPage(name) {
   if (name==='overview')    renderAdminOverview();
   if (name==='result')      renderResult();
   if (name==='dashboard')   initDashboard();
+  if (name==='eval-analysis') renderEvalAnalysis();
   if (name==='persons')     renderPersonsAdmin();
   if (name==='accounts')    renderAccountsAdmin();
   if (name==='my-overview') renderMyOverview();
@@ -3804,7 +3952,378 @@ async function selectCommentYear(safeKey, sabun, name, year) {
   listEl.innerHTML = html;
 }
 
+// ══ 평가 분석 대시보드 ══
+const EA_BONBU_LIST = ['사업지원본부','O2O플랫폼사업본부','퍼블리싱사업본부','ECI','청솔계열'];
+const EA_SHORT = {'사업지원본부':'사업지원','O2O플랫폼사업본부':'O2O플랫폼','퍼블리싱사업본부':'퍼블리싱','ECI':'ECI','청솔계열':'청솔계열'};
+const EA_COLORS = ['#3266AD','#2E7D32','#E65100','#6A1B9A','#C62828'];
+const EA_GRADE_COLORS = {S:'#3266AD',A:'#2E7D32',B:'#E65100',C:'#FF8F00','D/E':'#9E9E9E'};
+
+const EA_ALL_Q = [
+  {label:'25년 1Q',year:'2025',q:'1',idx:0},{label:'25년 2Q',year:'2025',q:'2',idx:1},
+  {label:'25년 3Q',year:'2025',q:'3',idx:2},{label:'25년 4Q',year:'2025',q:'4',idx:3},
+  {label:'26년 1Q',year:'2026',q:'1',idx:4},{label:'26년 2Q',year:'2026',q:'2',idx:5},
+  {label:'26년 3Q',year:'2026',q:'3',idx:6},{label:'26년 4Q',year:'2026',q:'4',idx:7},
+];
+const EA_BONBU_AVG = {
+  '사업지원본부':     [83,85,84,87,86,88,89,91],
+  'O2O플랫폼사업본부':[78,80,82,83,85,84,86,88],
+  '퍼블리싱사업본부': [88,89,90,91,91,92,93,94],
+  'ECI':            [75,77,79,80,81,82,83,85],
+  '청솔계열':         [80,81,82,83,84,85,86,87],
+};
+const EA_JIKCHEK_ADJ = {실장: 2, 팀장: -2};
+const EA_GRADE_DIST = [
+  {S:4,A:25,B:35,C:25,'D/E':11},{S:5,A:27,B:33,C:22,'D/E':13},
+  {S:6,A:29,B:32,C:20,'D/E':13},{S:7,A:30,B:30,C:20,'D/E':13},
+  {S:8,A:31,B:29,C:19,'D/E':13},{S:9,A:32,B:28,C:18,'D/E':13},
+  {S:10,A:33,B:27,C:17,'D/E':13},{S:11,A:34,B:26,C:16,'D/E':13},
+];
+const EA_RADAR = [
+  [82,79,84,80,83],[83,80,85,81,84],[84,81,86,82,85],[85,82,87,83,86],
+  [86,83,88,84,87],[87,84,89,85,88],[88,85,90,86,89],[89,86,91,87,90],
+];
+const EA_NYEON = [88,87,85,83,81,78];
+
+let eaTC=null, eaDC=null, eaBC=null, eaRC=null, eaNC=null;
+
+function eaGetAvg(bonbu, jikchek, idx) {
+  const base = EA_BONBU_AVG[bonbu][idx];
+  return jikchek === 'all' ? base : base + (EA_JIKCHEK_ADJ[jikchek]||0);
+}
+
+function renderEvalAnalysis() {
+  const year    = document.getElementById('ea-year')?.value || '2026';
+  const quarter = document.getElementById('ea-quarter')?.value || 'all';
+  const bonbu   = document.getElementById('ea-bonbu')?.value || 'all';
+  const jikchek = document.getElementById('ea-jikchek')?.value || 'all';
+
+  const desc = document.getElementById('ea-filter-desc');
+  if(desc) desc.textContent =
+    `${year==='all'?'전체 기간':year+'년'} · ${quarter==='all'?'전체 분기':quarter+'분기'} · ${bonbu==='all'?'전체 본부':bonbu} · ${jikchek==='all'?'전체 직책':jikchek}`;
+
+  let qs = EA_ALL_Q.filter(q => {
+    if(year!=='all' && q.year!==year) return false;
+    if(quarter!=='all' && q.q!==quarter) return false;
+    return true;
+  });
+  if(qs.length===0) qs = EA_ALL_Q.filter(q=>q.year==='2026');
+  const lastQ = qs[qs.length-1];
+  const prevQ = qs.length>1 ? qs[qs.length-2] : null;
+
+  const bonbuList = bonbu==='all' ? EA_BONBU_LIST : [bonbu];
+  const avgNow = Math.round(bonbuList.reduce((s,b)=>s+eaGetAvg(b,jikchek,lastQ.idx),0)/bonbuList.length);
+  const avgPrev = prevQ ? Math.round(bonbuList.reduce((s,b)=>s+eaGetAvg(b,jikchek,prevQ.idx),0)/bonbuList.length) : null;
+  const diff = avgPrev!==null ? avgNow-avgPrev : null;
+  const total = bonbu==='all' ? 106 : 21;
+  const incPct = 55 + lastQ.idx*2;
+  const incCnt = Math.round(total*incPct/100);
+  const bestB = bonbu==='all' ? EA_BONBU_LIST.reduce((a,b)=>eaGetAvg(a,jikchek,lastQ.idx)>=eaGetAvg(b,jikchek,lastQ.idx)?a:b) : bonbu;
+
+  const setEl=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  setEl('ea-s-total', total+'명');
+  setEl('ea-s-avg', avgNow+'점');
+  setEl('ea-s-diff', diff!==null ? `전분기 대비 ${diff>=0?'+':''}${diff}점` : '-');
+  setEl('ea-s-incentive', incCnt+'명');
+  setEl('ea-s-inc-pct', `전체의 ${incPct}%`);
+  setEl('ea-s-best', EA_SHORT[bestB]||bestB);
+  setEl('ea-s-best-score', '평균 '+eaGetAvg(bestB,jikchek,lastQ.idx)+'점');
+
+  // 추이 차트
+  const tLabels = qs.map(q=>q.label);
+  let tDatasets = [];
+  if(bonbu==='all'){
+    tDatasets = EA_BONBU_LIST.map((b,i)=>({
+      label:b, data:qs.map(q=>eaGetAvg(b,jikchek,q.idx)),
+      borderColor:EA_COLORS[i], backgroundColor:EA_COLORS[i]+'18',
+      borderWidth:2, pointRadius:3.5, pointHoverRadius:6, fill:false, tension:0.4
+    }));
+    setEl('ea-trend-title','분기별 평균 점수 추이 — 전체 본부');
+  } else {
+    const overall = qs.map(q=>Math.round(EA_BONBU_LIST.reduce((s,b)=>s+eaGetAvg(b,jikchek,q.idx),0)/EA_BONBU_LIST.length));
+    tDatasets = [
+      {label:'전체 평균', data:overall, borderColor:'#9E9E9E', borderDash:[5,4], borderWidth:1.5, pointRadius:2.5, fill:false, tension:0.4},
+      {label:bonbu, data:qs.map(q=>eaGetAvg(bonbu,jikchek,q.idx)), borderColor:EA_COLORS[0], backgroundColor:EA_COLORS[0]+'22', borderWidth:2.5, pointRadius:5, fill:true, tension:0.4},
+    ];
+    setEl('ea-trend-title','분기별 평균 점수 추이 — '+bonbu);
+  }
+  const legEl = document.getElementById('ea-trend-legend');
+  if(legEl) legEl.innerHTML = tDatasets.map(d=>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted)">
+      <span style="width:10px;height:10px;border-radius:2px;background:${d.borderColor};display:inline-block"></span>
+      ${EA_SHORT[d.label]||d.label}</span>`
+  ).join('');
+
+  if(eaTC) eaTC.destroy();
+  eaTC = new Chart(document.getElementById('ea-trendChart'),{
+    type:'line', data:{labels:tLabels, datasets:tDatasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${EA_SHORT[c.dataset.label]||c.dataset.label}: ${c.raw}점`}}},
+      scales:{y:{min:65,max:100,grid:{color:'#eee'},ticks:{font:{size:11},callback:v=>v+'점'}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
+  });
+
+  // 도넛
+  const gd = EA_GRADE_DIST[lastQ.idx] || EA_GRADE_DIST[7];
+  const gKeys = Object.keys(gd); const gVals = Object.values(gd);
+  const badgesEl = document.getElementById('ea-grade-badges');
+  if(badgesEl) badgesEl.innerHTML = gKeys.map(k=>
+    `<span style="font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;background:${EA_GRADE_COLORS[k]}22;color:${EA_GRADE_COLORS[k]}">${k} · ${gd[k]}명</span>`
+  ).join('');
+  if(eaDC) eaDC.destroy();
+  eaDC = new Chart(document.getElementById('ea-donutChart'),{
+    type:'doughnut', data:{labels:gKeys,datasets:[{data:gVals,backgroundColor:gKeys.map(k=>EA_GRADE_COLORS[k]),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false}}}
+  });
+
+  // 본부별 막대
+  const bVals = EA_BONBU_LIST.map(b=>eaGetAvg(b,jikchek,lastQ.idx));
+  const bColors = EA_BONBU_LIST.map((b,i)=>bonbu==='all'||bonbu===b ? EA_COLORS[i]+'cc' : EA_COLORS[i]+'33');
+  if(eaBC) eaBC.destroy();
+  eaBC = new Chart(document.getElementById('ea-barChart'),{
+    type:'bar', data:{labels:EA_BONBU_LIST.map(b=>EA_SHORT[b]),datasets:[{data:bVals,backgroundColor:bColors,borderRadius:5,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw}점`}}},
+      scales:{y:{min:65,max:100,grid:{color:'#eee'},ticks:{font:{size:11},callback:v=>v+'점'}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
+  });
+
+  // 레이더
+  const rVals = EA_RADAR[lastQ.idx] || EA_RADAR[7];
+  const rLabels = ['동기부여','코칭','소통 및 공감','조직역량','성과창출'];
+  setEl('ea-radar-title', `역량 항목별 평균 (${year==='all'?'전체':year+'년'}${quarter!=='all'?' '+quarter+'분기':''})`);
+  if(eaRC) eaRC.destroy();
+  eaRC = new Chart(document.getElementById('ea-radarChart'),{
+    type:'radar', data:{labels:rLabels,datasets:[{label:'평균',data:rVals,backgroundColor:'#3266AD22',borderColor:'#3266AD',borderWidth:2,pointBackgroundColor:'#3266AD',pointRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{r:{min:65,max:100,ticks:{font:{size:10},stepSize:10},pointLabels:{font:{size:11}}}}}
+  });
+
+  // 직책년차별
+  const nyColors=['#2E7D32','#2E7D32','#3266AD','#3266AD','#E65100','#E65100'];
+  if(eaNC) eaNC.destroy();
+  eaNC = new Chart(document.getElementById('ea-nyeonChart'),{
+    type:'bar', data:{labels:['1년차','2년차','3년차','4년차','5년차','6년차↑'],datasets:[{data:EA_NYEON,backgroundColor:nyColors,borderRadius:4,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw}점`}}},
+      scales:{y:{min:65,max:100,grid:{color:'#eee'},ticks:{font:{size:11},callback:v=>v+'점'}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
+  });
+
+  renderCommentCharts();
+}
+
 // ══ 접속 현황 대시보드 ══
+
+// ── 서술 분석 더미 데이터 ──
+const EA_COMMENT_PERSONS = {
+  '이문성': {
+    dir: '"성과 중심의 평가를 원칙으로 하되, 팀원 동기부여와 코칭 역량을 함께 살펴볼 예정입니다. 조직 내 소통 문화 개선에도 중점을 두겠습니다."',
+    dirTags: ['성과 중심','동기부여','코칭','소통'],
+    avgMatch: 82,
+    quarters: [
+      {q:'1분기', match:92, tone:'긍정', keywords:['성과달성','팀 소통'], text:'"목표 대비 성과가 우수하며 팀원과의 소통이 원활함. 동기부여 측면에서 강점을 보임."', alert:false},
+      {q:'2분기', match:78, tone:'긍정', keywords:['성과','리더십'],     text:'"전반적 성과는 양호하나 코칭 부분에서 추가 지원이 필요함. 리더십은 안정적."', alert:false},
+      {q:'3분기', match:55, tone:'중립', keywords:['업무처리','일정관리'], text:'"업무 처리 속도가 빠르고 일정 관리가 철저함. 팀 분위기 개선 필요."', alert:true},
+      {q:'4분기', match:88, tone:'긍정', keywords:['성과','동기부여','코칭'], text:'"연간 목표 달성. 동기부여와 코칭 역량이 향상됨. 소통 문화 정착."', alert:false},
+    ]
+  },
+  '정미상': {
+    dir: '"구성원 개개인의 성장을 중심에 두고, 코칭과 피드백 문화를 정착시키는 방향으로 평가하겠습니다."',
+    dirTags: ['성장','코칭','피드백'],
+    avgMatch: 88,
+    quarters: [
+      {q:'1분기', match:90, tone:'긍정', keywords:['코칭','피드백'], text:'"정기적 1:1 코칭을 통해 구성원 성장을 지원. 피드백 수용도 높음."', alert:false},
+      {q:'2분기', match:85, tone:'긍정', keywords:['성장','역량개발'], text:'"역량 개발 의지가 강하며 자기주도적 학습 태도가 돋보임."', alert:false},
+      {q:'3분기', match:91, tone:'긍정', keywords:['코칭','목표'], text:'"코칭 기반 목표 설정으로 팀 전체 성과 향상에 기여."', alert:false},
+      {q:'4분기', match:86, tone:'긍정', keywords:['성장','피드백','소통'], text:'"연간 성장 목표 달성. 피드백 문화 정착으로 팀 역량 전반 향상."', alert:false},
+    ]
+  },
+  '박종박': {
+    dir: '"조직 효율화와 성과 극대화에 집중하되, 구성원 간 협업 문화를 강화하겠습니다."',
+    dirTags: ['효율화','성과','협업'],
+    avgMatch: 71,
+    quarters: [
+      {q:'1분기', match:82, tone:'긍정', keywords:['성과','협업'], text:'"팀 협업이 원활하며 목표 대비 성과 달성률이 높음."', alert:false},
+      {q:'2분기', match:65, tone:'중립', keywords:['업무량','일정'], text:'"업무량 증가로 일정 관리에 어려움. 협업보다 개인 작업 위주."', alert:true},
+      {q:'3분기', match:58, tone:'중립', keywords:['개인성과','처리속도'], text:'"개인 업무 처리 속도는 빠르나 팀 시너지 부족."', alert:true},
+      {q:'4분기', match:80, tone:'긍정', keywords:['협업','성과회복'], text:'"하반기 협업 강화로 팀 성과 회복. 연간 목표 달성."', alert:false},
+    ]
+  }
+};
+
+const EA_BONBU_COMMENT = [
+  {name:'사업지원본부', short:'사업지원', match:82, len:142, str:['성과창출','소통'], weak:['코칭']},
+  {name:'O2O플랫폼사업본부', short:'O2O플랫폼', match:68, len:88,  str:['동기부여','조직역량'], weak:['성과창출','코칭']},
+  {name:'퍼블리싱사업본부', short:'퍼블리싱', match:91, len:178, str:['코칭','소통'], weak:[]},
+  {name:'ECI', short:'ECI', match:61, len:95,  str:['조직역량'], weak:['동기부여','소통']},
+  {name:'청솔계열', short:'청솔계열', match:75, len:121, str:['성과창출','소통'], weak:['코칭']},
+];
+
+const EA_KEYWORDS = ['성과창출','소통','동기부여','조직역량','코칭','목표달성','리더십','문제해결'];
+const EA_KEYWORD_CNT = [42,38,35,31,28,25,22,18];
+
+let eaLenC=null, eaKwC=null;
+
+function eaMatchColor(v){ return v>=80?'#2E7D32':v>=65?'#E65100':'#C62828'; }
+function eaToneStyle(t){ return t==='긍정'?{bg:'#e8f5e9',c:'#2e7d32'}:t==='중립'?{bg:'#f5f5f5',c:'#616161'}:{bg:'#ffebee',c:'#c62828'}; }
+
+function renderCommentDetail() {
+  const name = document.getElementById('ea-person-sel')?.value || '이문성';
+  const data = EA_COMMENT_PERSONS[name];
+  if (!data) return;
+
+  // 평균 일치도 배지
+  const badge = document.getElementById('ea-avg-match-badge');
+  if (badge) { badge.textContent = '평균 일치도 '+data.avgMatch+'%'; badge.style.color=eaMatchColor(data.avgMatch); badge.style.background=eaMatchColor(data.avgMatch)+'18'; }
+
+  // 연초 방향
+  const dirBox = document.getElementById('ea-dir-box');
+  if (dirBox) {
+    dirBox.innerHTML = '';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:11px;color:#6A1B9A;font-weight:600;margin-bottom:6px';
+    label.textContent = '📌 연초 평가 방향';
+    const txt = document.createElement('div');
+    txt.style.cssText = 'font-size:12px;color:var(--text);line-height:1.7;margin-bottom:8px';
+    txt.textContent = data.dir;
+    const tags = document.createElement('div');
+    tags.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap';
+    data.dirTags.forEach(t => {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;background:#f3e8ff;color:#6A1B9A;font-weight:500';
+      tag.textContent = t;
+      tags.appendChild(tag);
+    });
+    dirBox.appendChild(label); dirBox.appendChild(txt); dirBox.appendChild(tags);
+  }
+
+  // 분기별 그리드
+  const grid = document.getElementById('ea-quarter-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  data.quarters.forEach(d => {
+    const cell = document.createElement('div');
+    cell.style.cssText = 'background:var(--bg);border-radius:8px;padding:10px;border:1px solid var(--border);'+(d.alert?'border-color:#E65100;':'');
+
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px';
+    const qLbl = document.createElement('span');
+    qLbl.style.cssText = 'font-size:12px;font-weight:700;color:var(--text)';
+    qLbl.textContent = d.q;
+    topRow.appendChild(qLbl);
+    if (d.alert) { const w=document.createElement('span'); w.style.cssText='font-size:10px;color:#E65100'; w.textContent='⚠️ 방향 이탈'; topRow.appendChild(w); }
+    cell.appendChild(topRow);
+
+    const pct = document.createElement('div');
+    pct.style.cssText = 'font-size:11px;font-weight:600;color:'+eaMatchColor(d.match)+';margin-bottom:4px';
+    pct.textContent = '일치도 '+d.match+'%';
+    cell.appendChild(pct);
+
+    const barWrap = document.createElement('div');
+    barWrap.style.cssText = 'height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin-bottom:8px';
+    const barFill = document.createElement('div');
+    barFill.style.cssText = 'height:100%;border-radius:3px;width:'+d.match+'%;background:'+eaMatchColor(d.match);
+    barWrap.appendChild(barFill);
+    cell.appendChild(barWrap);
+
+    const tagsRow = document.createElement('div');
+    tagsRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px';
+    const ts = eaToneStyle(d.tone);
+    const toneBadge = document.createElement('span');
+    toneBadge.style.cssText = 'display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:'+ts.bg+';color:'+ts.c+';font-weight:500';
+    toneBadge.textContent = d.tone;
+    tagsRow.appendChild(toneBadge);
+    d.keywords.forEach(k => {
+      const kt = document.createElement('span');
+      kt.style.cssText = 'display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:var(--surface);color:var(--text-muted);border:1px solid var(--border)';
+      kt.textContent = k;
+      tagsRow.appendChild(kt);
+    });
+    cell.appendChild(tagsRow);
+
+    const txtEl = document.createElement('div');
+    txtEl.style.cssText = 'font-size:11px;color:var(--text-muted);line-height:1.6;font-style:italic';
+    txtEl.textContent = d.text;
+    cell.appendChild(txtEl);
+    grid.appendChild(cell);
+  });
+}
+
+function renderCommentCharts() {
+  // 일치도 목록
+  const listEl = document.getElementById('ea-consistency-list');
+  if (listEl) {
+    listEl.innerHTML = '';
+    EA_BONBU_COMMENT.forEach(b => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border)';
+      const nm = document.createElement('div');
+      nm.style.cssText = 'width:70px;font-size:12px;font-weight:600;color:var(--text);flex-shrink:0';
+      nm.textContent = b.short;
+      const bw = document.createElement('div');
+      bw.style.cssText = 'flex:1;height:7px;border-radius:3px;background:var(--border);overflow:hidden';
+      const bf = document.createElement('div');
+      bf.style.cssText = 'height:100%;border-radius:3px;width:'+b.match+'%;background:'+eaMatchColor(b.match);
+      bw.appendChild(bf);
+      const pct = document.createElement('div');
+      pct.style.cssText = 'font-size:12px;font-weight:600;color:'+eaMatchColor(b.match)+';min-width:34px;text-align:right';
+      pct.textContent = b.match+'%';
+      row.appendChild(nm); row.appendChild(bw); row.appendChild(pct);
+      listEl.appendChild(row);
+    });
+  }
+
+  // 성실도 차트
+  if (eaLenC) eaLenC.destroy();
+  const lenEl = document.getElementById('ea-lenChart');
+  if (lenEl) {
+    eaLenC = new Chart(lenEl, {
+      type:'bar',
+      data:{labels:EA_BONBU_COMMENT.map(b=>b.short),datasets:[{data:EA_BONBU_COMMENT.map(b=>b.len),backgroundColor:EA_BONBU_COMMENT.map(b=>b.len>=100?'#3266ADaa':'#C62828aa'),borderRadius:5,borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'자'}}},
+        scales:{y:{min:0,grid:{color:'#eee'},ticks:{font:{size:10},callback:v=>v+'자'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+    });
+  }
+
+  // 키워드 빈도 차트
+  if (eaKwC) eaKwC.destroy();
+  const kwEl = document.getElementById('ea-keywordChart');
+  if (kwEl) {
+    eaKwC = new Chart(kwEl, {
+      type:'bar',
+      data:{labels:EA_KEYWORDS,datasets:[{data:EA_KEYWORD_CNT,backgroundColor:'#6A1B9A44',borderColor:'#6A1B9A',borderWidth:1,borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'회'}}},
+        scales:{x:{grid:{color:'#eee'},ticks:{font:{size:10},callback:v=>v+'회'}},y:{grid:{display:false},ticks:{font:{size:10}}}}}
+    });
+  }
+
+  // 본부별 강점/보완 태그
+  const tagsEl = document.getElementById('ea-bonbu-tags');
+  if (tagsEl) {
+    tagsEl.innerHTML = '';
+    EA_BONBU_COMMENT.forEach(b => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);flex-wrap:wrap';
+      const nm = document.createElement('div');
+      nm.style.cssText = 'width:64px;font-size:12px;font-weight:600;color:var(--text);flex-shrink:0;padding-top:2px';
+      nm.textContent = b.short;
+      const tags = document.createElement('div');
+      tags.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;flex:1';
+      b.str.forEach(s => {
+        const t=document.createElement('span');
+        t.style.cssText='display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:#e8f5e9;color:#2e7d32;font-weight:500';
+        t.textContent=s; tags.appendChild(t);
+      });
+      b.weak.forEach(w => {
+        const t=document.createElement('span');
+        t.style.cssText='display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:#ffebee;color:#c62828;font-weight:500';
+        t.textContent=w; tags.appendChild(t);
+      });
+      if (!b.weak.length) { const t=document.createElement('span'); t.style.cssText='font-size:11px;color:#2e7d32'; t.textContent='✅ 보완 없음'; tags.appendChild(t); }
+      row.appendChild(nm); row.appendChild(tags);
+      tagsEl.appendChild(row);
+    });
+  }
+
+  renderCommentDetail();
+}
+
+
 let dashChart = null;
 
 const DASH_DATA = {

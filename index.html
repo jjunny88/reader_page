@@ -2265,11 +2265,53 @@ function parseExcel(file){
         newEvalData[p.no]=old&&evalData[old.no]?evalData[old.no]:{g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
       });
       evalData=newEvalData;
+
+      // ══ hrPersons 자동 동기화 ══
+      // 기존 hrPersons에서 사번/이름으로 매칭해 기존 데이터는 보존하고, 없는 사람은 신규 추가
+      let hrSynced = 0, hrAdded = 0;
+      parsed.forEach(p => {
+        const sabun = p.sabun || '';
+        const name  = p.name  || '';
+
+        // 기존 hrPersons에서 매칭 (사번 우선, 없으면 이름)
+        let existing = hrPersons.find(h =>
+          (sabun && (h['사번']||'').toString().trim() === sabun) ||
+          ((h['이름']||h['성명']||'').trim() === name)
+        );
+
+        const hrEntry = {
+          '사번':    sabun,
+          '이름':    name,
+          '회사':    p.company  || '',
+          '본부':    p.bonbu    || '',
+          '지점':    p.jijum    || '',
+          '실':      p.sil      || '',
+          '팀':      p.team     || '',
+          '직책':    p.jikchek  || '',
+          '직책급':  p.jikchekgup || '',
+          '직급':    p.jikgup   || '',
+          '이메일':  p.email    || '',
+          '직책년차':p.nyeoncha || '',
+          '비고':    p.bigo     || '',
+        };
+
+        if (existing) {
+          // 기존 항목 업데이트 (이름·조직 정보만, PDF/사진 등 hrExtra는 건드리지 않음)
+          Object.assign(existing, hrEntry);
+          hrSynced++;
+        } else {
+          // 신규 추가
+          hrPersons.push(hrEntry);
+          hrAdded++;
+        }
+      });
+
       save();
       renderPersonsAdmin();
 
       let msg=`✅ ${parsed.length}명 업로드 완료`;
       if(newPersonAccounts>0) msg+=` · 직책자 계정 ${newPersonAccounts}개 자동 생성 (초기 비밀번호: 1111111)`;
+      msg+=`<br>📋 인사현황 자동 동기화: <strong>기존 ${hrSynced}명 업데이트</strong> · <strong>신규 ${hrAdded}명 추가</strong>`;
       if(warnings.length) msg+=`<br><span style="color:#b7791f">⚠️ ${warnings.join('<br>')}</span>`;
       showUploadResult(warnings.length?'warn':'ok',msg);
     }catch(err){

@@ -724,8 +724,7 @@ function initApp() {
     {page:'hr-list',    icon:'👤', label:'인적사항 목록'},
     {page:'hr-upload',  icon:'📂', label:'인사 데이터 업로드'},
     {section:'관리'},
-    {page:'persons',    icon:'👥', label:'직책자 관리'},
-    {page:'accounts',   icon:'🔐', label:'계정 관리'},
+    {page:'members',    icon:'👥', label:'인원 통합 관리'},
     {section:'기준'},
     {page:'criteria',   icon:'📌', label:'등급 기준'},
   ];
@@ -943,7 +942,7 @@ function buildAdminPages() {
     <div class="card">
       <div class="card-header">
         <span class="card-title">■ 26년 직책자 평가 대상자</span>
-        <span style="margin-left:auto"><button class="btn btn-primary btn-sm" onclick="showPage('persons')">👥 직책자 관리</button></span>
+        <span style="margin-left:auto"><button class="btn btn-primary btn-sm" onclick="showPage('members')">👥 인원 통합 관리</button></span>
       </div>
       <div class="card-body">
         <div class="alert alert-info">※ 평가 등급 및 인센티브 지급 기준(직책 년차별 기준 상향) [실/팀장 공통 적용]</div>
@@ -1189,126 +1188,112 @@ function buildAdminPages() {
     </div>
   </div>
 
-  <!-- Persons Admin -->
-  <div class="page" id="page-persons">
-    <!-- 엑셀 업로드 카드 -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">📂 직책자 엑셀 업로드</span>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <button class="btn btn-accent btn-sm" onclick="downloadPersonsTemplate()">📥 양식 다운로드</button>
-          <span style="font-size:11px;color:var(--text-muted)">업로드 시 기존 직책자 데이터 전체 교체</span>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
-          📌 양식을 다운받아 작성 후 업로드하세요.<br>
-          컬럼: <strong>순번 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책 | 직책급 | 직급 | 사원명 | 사번 | 회사메일 | 직책년차 | 비고 | 평가자</strong>
-          <br><span style="color:var(--text-muted)">※ '평가자' 컬럼은 계정에 등록된 <strong>이름</strong>과 일치해야 자동 매핑됩니다.</span>
-        </div>
-        <div class="upload-zone" id="upload-zone"
-          onclick="document.getElementById('excel-file').click()"
-          ondragover="event.preventDefault();this.classList.add('drag')"
-          ondragleave="this.classList.remove('drag')"
-          ondrop="handleDrop(event)">
-          <div class="upload-icon">📊</div>
-          <div class="upload-text"><strong>직책자 엑셀 파일 클릭 또는 드래그</strong><br>.xlsx / .xls 지원</div>
-        </div>
-        <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)">
-        <div class="upload-result" id="upload-result"></div>
-      </div>
-    </div>
-    <!-- 직책자 목록 카드 -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">👥 직책자 목록</span>
-        <div style="margin-left:auto;display:flex;gap:8px;">
-          <button class="btn btn-outline btn-sm" onclick="exportPersonsExcel()">📤 현재 목록 내보내기</button>
-          <button class="btn btn-primary btn-sm" onclick="openPModal()">+ 직책자 추가</button>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="tbl-wrap"><table>
-          <thead><tr>
-            <th>순번</th><th>사원명</th><th>사번</th><th>회사명</th><th>본부</th><th>지점</th><th>실/센터</th><th>팀</th><th>직책</th><th>직책급</th><th>직급</th><th>직책년차</th><th>비고</th><th>담당평가자</th><th>관리</th>
-          </tr></thead>
-          <tbody id="persons-tbody"></tbody>
-        </table></div>
-      </div>
-    </div>
-  </div>
+  <!-- 인원 통합 관리 -->
+  <div class="page" id="page-members">
 
-  <!-- Accounts Admin -->
-  <div class="page" id="page-accounts">
-
-    <!-- 계정 일괄 업로드 카드 -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">📋 계정 일괄 업로드</span>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <button class="btn btn-accent btn-sm" onclick="downloadAccountTemplate()">📥 양식 다운로드</button>
-        </div>
+    <!-- 엑셀 업로드 탭 -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header" style="cursor:pointer" onclick="toggleMembersUpload()">
+        <span class="card-title">📋 엑셀 일괄 업로드</span>
+        <span id="members-upload-arrow" style="margin-left:auto;font-size:12px;color:var(--text-muted)">▼ 펼치기</span>
       </div>
-      <div class="card-body">
-        <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
-          📌 양식을 다운받아 작성 후 업로드하세요. <strong>계정 + 직책자 목록이 한 번에 반영됩니다.</strong><br>
-          컬럼: <strong>사번 | 이름 | 권한 | 소속 | 직책 | 비밀번호 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책급 | 직급 | 회사메일 | 직책년차 | 비고</strong><br>
-          <span style="color:var(--text-muted)">
-            권한: <strong>admin</strong>(관리자) / <strong>eval</strong>(평가자·부서장) / <strong>person</strong>(피평가자·직책자) &nbsp;·&nbsp;
-            비밀번호 비워두면 <strong>1111111</strong> 자동 설정<br>
-            ✨ <strong>자동 매핑:</strong> eval의 <strong>지점</strong> = person의 <strong>지점</strong>이 같으면 평가자 자동 연결
-          </span>
+      <div id="members-upload-body" style="display:none">
+        <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <!-- 직책자 업로드 -->
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:8px">👥 직책자 목록 업로드</div>
+            <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
+              컬럼: 순번 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책 | 직책급 | 직급 | 사원명 | 사번 | 회사메일 | 직책년차 | 비고 | 평가자
+            </div>
+            <div class="upload-zone" id="upload-zone"
+              onclick="document.getElementById('excel-file').click()"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handleDrop(event)">
+              <div class="upload-icon">📊</div>
+              <div class="upload-text"><strong>직책자 엑셀 클릭 또는 드래그</strong></div>
+            </div>
+            <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)">
+            <div class="upload-result" id="upload-result"></div>
+            <button class="btn btn-accent btn-sm" style="margin-top:6px" onclick="downloadPersonsTemplate()">📥 양식 다운로드</button>
+          </div>
+          <!-- 계정 업로드 -->
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:8px">🔐 계정 일괄 업로드</div>
+            <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
+              컬럼: 사번 | 이름 | 권한(admin/eval/person) | 소속 | 직책 | 비밀번호<br>
+              비밀번호 비워두면 1111111 자동 설정
+            </div>
+            <div class="upload-zone" onclick="document.getElementById('acc-file').click()"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handleAccDrop(event)">
+              <div class="upload-icon">👥</div>
+              <div class="upload-text"><strong>계정 엑셀 클릭 또는 드래그</strong></div>
+            </div>
+            <input type="file" id="acc-file" accept=".xlsx,.xls" style="display:none" onchange="handleAccUpload(event)">
+            <div class="upload-result" id="upload-result-acc"></div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <button class="btn btn-accent btn-sm" onclick="downloadAccountTemplate()">📥 양식 다운로드</button>
+            </div>
+          </div>
         </div>
-        <div class="upload-zone" onclick="document.getElementById('acc-file').click()"
-          ondragover="event.preventDefault();this.classList.add('drag')"
-          ondragleave="this.classList.remove('drag')"
-          ondrop="handleAccDrop(event)">
-          <div class="upload-icon">👥</div>
-          <div class="upload-text"><strong>계정 엑셀 파일 클릭 또는 드래그</strong><br>.xlsx / .xls</div>
+        <!-- 비밀번호 일괄 변경 -->
+        <div class="card-body" style="border-top:1px solid var(--border);padding-top:12px">
+          <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:8px">🔑 비밀번호 일괄 변경 <span style="font-size:11px;font-weight:400;color:var(--text-muted)">사번 | 비밀번호 형식</span></div>
+          <div class="upload-zone" id="upload-zone-pw" style="padding:14px"
+            onclick="document.getElementById('pw-file').click()"
+            ondragover="event.preventDefault();this.classList.add('drag')"
+            ondragleave="this.classList.remove('drag')"
+            ondrop="handlePwDrop(event)">
+            <div class="upload-text"><strong>비밀번호 엑셀 클릭 또는 드래그</strong></div>
+          </div>
+          <input type="file" id="pw-file" accept=".xlsx,.xls" style="display:none" onchange="handlePwUpload(event)">
+          <div class="upload-result" id="upload-result-pw"></div>
         </div>
-        <input type="file" id="acc-file" accept=".xlsx,.xls" style="display:none" onchange="handleAccUpload(event)">
-        <div class="upload-result" id="upload-result-acc"></div>
       </div>
     </div>
 
-    <!-- 비밀번호 일괄 업로드 카드 -->
+    <!-- 통합 인원 목록 -->
     <div class="card">
       <div class="card-header">
-        <span class="card-title">🔑 비밀번호 일괄 변경</span>
-        <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">사번 기준으로 비밀번호만 변경</span>
-      </div>
-      <div class="card-body">
-        <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
-          📌 엑셀 형식: <strong>사번 | 비밀번호</strong> (1행 헤더, 2행부터 데이터)
-        </div>
-        <div class="upload-zone" id="upload-zone-pw"
-          onclick="document.getElementById('pw-file').click()"
-          ondragover="event.preventDefault();this.classList.add('drag')"
-          ondragleave="this.classList.remove('drag')"
-          ondrop="handlePwDrop(event)">
-          <div class="upload-icon">🔑</div>
-          <div class="upload-text"><strong>비밀번호 엑셀 파일 클릭 또는 드래그</strong><br>사번 | 비밀번호 형식 .xlsx / .xls</div>
-        </div>
-        <input type="file" id="pw-file" accept=".xlsx,.xls" style="display:none" onchange="handlePwUpload(event)">
-        <div class="upload-result" id="upload-result-pw"></div>
-      </div>
-    </div>
-
-    <!-- 계정 목록 카드 -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">🔐 전체 계정 목록</span>
-        <div style="margin-left:auto;display:flex;gap:8px">
-          <button class="btn btn-outline btn-sm" onclick="exportAccountsExcel()">📤 현재 계정 내보내기</button>
-          <button class="btn btn-primary btn-sm" onclick="openAModal()">+ 계정 추가</button>
+        <span class="card-title">👥 인원 통합 목록</span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="members-filter-role" onchange="renderMembersAdmin()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+            <option value="">전체 권한</option>
+            <option value="admin">관리자</option>
+            <option value="eval">평가자</option>
+            <option value="person">직책자</option>
+          </select>
+          <select id="members-filter-hr" onchange="renderMembersAdmin()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+            <option value="">인적사항 전체</option>
+            <option value="included">인적사항 포함</option>
+            <option value="excluded">인적사항 미포함</option>
+          </select>
+          <input id="members-search" type="text" placeholder="이름·사번 검색" oninput="renderMembersAdmin()"
+            style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;width:140px">
+          <button class="btn btn-outline btn-sm" onclick="exportAccountsExcel()">📤 내보내기</button>
+          <button class="btn btn-primary btn-sm" onclick="openAModal()">+ 인원 추가</button>
         </div>
       </div>
-      <div class="card-body">
-        <div class="alert alert-warning" style="font-size:12px">※ 비밀번호는 저장 후 확인이 불가합니다. 분실 시 새 비밀번호로 재설정하세요.</div>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>사번</th><th>이름</th><th>소속</th><th>직책</th><th>권한</th><th>인적사항조회</th><th>담당 직책자 수</th><th>관리</th></tr></thead>
-          <tbody id="accounts-tbody"></tbody>
-        </table></div>
+      <div class="card-body" style="padding:0">
+        <div class="alert alert-warning" style="margin:12px 18px 0;font-size:12px">※ 비밀번호는 저장 후 확인이 불가합니다. 분실 시 새 비밀번호로 재설정하세요.</div>
+        <div class="tbl-wrap" style="padding:12px 0">
+          <table>
+            <thead><tr>
+              <th>사번</th>
+              <th>이름</th>
+              <th>소속</th>
+              <th>직책</th>
+              <th>권한</th>
+              <th style="min-width:160px">체크 항목</th>
+              <th>인적사항</th>
+              <th>담당 직책자</th>
+              <th>관리</th>
+            </tr></thead>
+            <tbody id="members-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -1638,7 +1623,7 @@ function showPage(name) {
 
   const titles = {
     'overview':'직책자 현황', 'result':'전체 평가 결과', 'persons':'직책자 관리',
-    'accounts':'계정 관리', 'criteria':'등급 기준',
+    'accounts':'계정 관리', 'members':'인원 통합 관리', 'criteria':'등급 기준',
     'my-overview':'담당 직책자 현황', 'eval':'평가 입력',
     'my-dashboard':'내 평가 결과',
     'hr-list':'인적사항 목록', 'hr-upload':'인사 데이터 업로드', 'hr-detail':'개인 상세 카드',
@@ -1656,6 +1641,7 @@ function showPage(name) {
   if (name==='eval-analysis') renderEvalAnalysis();
   if (name==='persons')     renderPersonsAdmin();
   if (name==='accounts')    renderAccountsAdmin();
+  if (name==='members')     renderMembersAdmin();
   if (name==='my-overview') renderMyOverview();
   if (name==='eval')        renderEvalForm();
   if (name==='my-dashboard')renderMyDashboard();
@@ -2173,13 +2159,13 @@ function saveAccount(){
     accounts.push({id,pw,name,role,dept,position,hrView});
     showToast('✅ 계정이 추가되었습니다.');
   }
-  save(); closeAModal(); renderAccountsAdmin();
+  save(); closeAModal(); renderAccountsAdmin(); renderMembersAdmin();
 }
 function deleteAccount(id){
   if(id==='admin'){showToast('기본 관리자 계정은 삭제할 수 없습니다.');return;}
   if(!confirm(id+' 계정을 삭제하시겠습니까?'))return;
   accounts=accounts.filter(a=>a.id!==id);
-  save(); renderAccountsAdmin(); showToast('삭제되었습니다.');
+  save(); renderAccountsAdmin(); renderMembersAdmin(); showToast('삭제되었습니다.');
 }
 
 // ══ EXCEL UPLOAD ══
@@ -2265,53 +2251,11 @@ function parseExcel(file){
         newEvalData[p.no]=old&&evalData[old.no]?evalData[old.no]:{g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
       });
       evalData=newEvalData;
-
-      // ══ hrPersons 자동 동기화 ══
-      // 기존 hrPersons에서 사번/이름으로 매칭해 기존 데이터는 보존하고, 없는 사람은 신규 추가
-      let hrSynced = 0, hrAdded = 0;
-      parsed.forEach(p => {
-        const sabun = p.sabun || '';
-        const name  = p.name  || '';
-
-        // 기존 hrPersons에서 매칭 (사번 우선, 없으면 이름)
-        let existing = hrPersons.find(h =>
-          (sabun && (h['사번']||'').toString().trim() === sabun) ||
-          ((h['이름']||h['성명']||'').trim() === name)
-        );
-
-        const hrEntry = {
-          '사번':    sabun,
-          '이름':    name,
-          '회사':    p.company  || '',
-          '본부':    p.bonbu    || '',
-          '지점':    p.jijum    || '',
-          '실':      p.sil      || '',
-          '팀':      p.team     || '',
-          '직책':    p.jikchek  || '',
-          '직책급':  p.jikchekgup || '',
-          '직급':    p.jikgup   || '',
-          '이메일':  p.email    || '',
-          '직책년차':p.nyeoncha || '',
-          '비고':    p.bigo     || '',
-        };
-
-        if (existing) {
-          // 기존 항목 업데이트 (이름·조직 정보만, PDF/사진 등 hrExtra는 건드리지 않음)
-          Object.assign(existing, hrEntry);
-          hrSynced++;
-        } else {
-          // 신규 추가
-          hrPersons.push(hrEntry);
-          hrAdded++;
-        }
-      });
-
       save();
       renderPersonsAdmin();
 
       let msg=`✅ ${parsed.length}명 업로드 완료`;
       if(newPersonAccounts>0) msg+=` · 직책자 계정 ${newPersonAccounts}개 자동 생성 (초기 비밀번호: 1111111)`;
-      msg+=`<br>📋 인사현황 자동 동기화: <strong>기존 ${hrSynced}명 업데이트</strong> · <strong>신규 ${hrAdded}명 추가</strong>`;
       if(warnings.length) msg+=`<br><span style="color:#b7791f">⚠️ ${warnings.join('<br>')}</span>`;
       showUploadResult(warnings.length?'warn':'ok',msg);
     }catch(err){
@@ -5003,6 +4947,164 @@ function exportCSV(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download='26년1분기직책자평가결과.csv'; a.click();
   showToast('📥 CSV 파일 다운로드 완료');
+}
+
+// ══ 인원 통합 관리 ══
+function toggleMembersUpload() {
+  const body = document.getElementById('members-upload-body');
+  const arrow = document.getElementById('members-upload-arrow');
+  if (!body) return;
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  if (arrow) arrow.textContent = open ? '▲ 접기' : '▼ 펼치기';
+}
+
+function toggleHrIncluded(sabun, name, checked) {
+  // hrPersons에서 해당 인원 찾기 (사번 또는 이름 기준)
+  let hrP = hrPersons.find(h =>
+    (sabun && (h['사번']||'').toString().trim() === sabun) ||
+    ((h['이름']||h['성명']||'').trim() === name)
+  );
+
+  if (checked) {
+    // 포함 체크 → hrPersons에 없으면 추가
+    if (!hrP) {
+      const p = persons.find(p => (sabun && p.sabun===sabun) || p.name===name);
+      const a = accounts.find(a => a.id===sabun || a.name===name);
+      hrPersons.push({
+        '사번':   sabun || '',
+        '이름':   name  || '',
+        '회사':   p?.company  || '',
+        '본부':   p?.bonbu    || a?.dept || '',
+        '지점':   p?.jijum    || '',
+        '실':     p?.sil      || '',
+        '팀':     p?.team     || '',
+        '직책':   p?.jikchek  || a?.position || '',
+        '직책급': p?.jikchekgup || '',
+        '직급':   p?.jikgup   || '',
+        '이메일': p?.email    || '',
+        '직책년차': p?.nyeoncha || '',
+      });
+    }
+  } else {
+    // 해제 → hrPersons에서 제거
+    if (hrP) {
+      hrPersons = hrPersons.filter(h => h !== hrP);
+    }
+  }
+  save();
+  renderMembersAdmin();
+  showToast(checked ? `✅ ${name} 인적사항 포함` : `❌ ${name} 인적사항 제외`);
+}
+
+function toggleHrView(accountId, checked) {
+  const acc = accounts.find(a => a.id === accountId);
+  if (!acc) return;
+  acc.hrView = checked;
+  save();
+  showToast(checked ? '✅ 인사조회 허용' : '인사조회 해제');
+}
+
+function renderMembersAdmin() {
+  const tb = document.getElementById('members-tbody');
+  if (!tb) return;
+
+  const roleFilter = document.getElementById('members-filter-role')?.value || '';
+  const hrFilter   = document.getElementById('members-filter-hr')?.value   || '';
+  const search     = (document.getElementById('members-search')?.value || '').trim().toLowerCase();
+
+  // accounts 기준으로 목록 구성
+  let list = accounts.filter(a => {
+    if (roleFilter && a.role !== roleFilter) return false;
+    if (search && !a.name.toLowerCase().includes(search) && !a.id.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  // hrPersons 포함 여부 필터
+  if (hrFilter) {
+    list = list.filter(a => {
+      const inHr = hrPersons.some(h =>
+        (a.id && (h['사번']||'').toString().trim() === a.id) ||
+        ((h['이름']||h['성명']||'').trim() === a.name)
+      );
+      return hrFilter === 'included' ? inHr : !inHr;
+    });
+  }
+
+  const roleLabel = {admin:'관리자', eval:'평가자(부서장)', person:'직책자'}; 
+  const roleCls   = {admin:'role-admin', eval:'role-eval', person:'role-person'};
+
+  tb.innerHTML = '';
+  list.forEach(a => {
+    // persons에서 조직 정보
+    const p = persons.find(x => x.sabun === a.id || x.name === a.name);
+    const dept = p ? `${p.bonbu||''} ${p.jijum||''}`.trim() : (a.dept||'-');
+    const pos  = p ? (p.jikchek||'-') : (a.position||'-');
+
+    // hrPersons 포함 여부
+    const inHr = hrPersons.some(h =>
+      (a.id && (h['사번']||'').toString().trim() === a.id) ||
+      ((h['이름']||h['성명']||'').trim() === a.name)
+    );
+
+    // 담당 직책자 수 (평가자만)
+    const cnt = a.role === 'eval' ? persons.filter(x => x.evaluatorId === a.id).length : null;
+
+    const rowStyle = !inHr && a.role !== 'admin' ? 'opacity:0.55' : '';
+
+    tb.innerHTML += `<tr style="${rowStyle}">
+      <td style="font-size:11px;color:var(--text-muted)">${a.id}</td>
+      <td><strong>${a.name}</strong></td>
+      <td style="font-size:11px">${dept}</td>
+      <td style="font-size:11px">${pos}</td>
+      <td><span class="${roleCls[a.role]||''}">${roleLabel[a.role]||a.role}</span></td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+            <input type="checkbox" ${inHr?'checked':''} ${a.role==='admin'?'disabled':''}
+              onchange="toggleHrIncluded('${a.id}','${a.name}',this.checked)">
+            인적사항 포함
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+            <input type="checkbox" ${a.hrView?'checked':''} ${a.role==='admin'?'disabled':''}
+              onchange="toggleHrView('${a.id}',this.checked)">
+            인사조회 허용
+          </label>
+        </div>
+      </td>
+      <td>
+        ${inHr
+          ? '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;background:#e8f5e9;color:#2e7d32;font-weight:600">✓ 포함</span>'
+          : (a.role==='admin' ? '-' : '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;background:#eee;color:#999;font-weight:600">– 미포함</span>')
+        }
+      </td>
+      <td style="font-size:12px">${cnt !== null ? cnt+'명' : '-'}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-outline btn-sm" onclick="openAModal('${a.id}')">수정</button>
+          ${a.id!=='admin'
+            ? `<button class="btn btn-danger btn-sm" onclick="deleteAccount('${a.id}')">삭제</button>`
+            : '<span style="font-size:10px;color:var(--text-muted)">기본계정</span>'}
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  // 하단 요약
+  const total  = list.length;
+  const inHrCnt = list.filter(a => hrPersons.some(h =>
+    (a.id && (h['사번']||'').toString().trim() === a.id) ||
+    ((h['이름']||h['성명']||'').trim() === a.name)
+  )).length;
+  const existingTr = document.getElementById('members-summary-row');
+  if (existingTr) existingTr.remove();
+  const summaryTr = document.createElement('tr');
+  summaryTr.id = 'members-summary-row';
+  summaryTr.innerHTML = `<td colspan="9" style="background:#f0f3f8;padding:8px 14px;font-size:11px;color:var(--text-muted);text-align:left">
+    총 ${total}명 표시 중 · 인적사항 포함 ${inHrCnt}명 · 미포함 ${total-inHrCnt}명
+    <span style="margin-left:12px;color:#b7791f">※ 흐린 행 = 인적사항 미포함</span>
+  </td>`;
+  tb.appendChild(summaryTr);
 }
 
 // ══ TOAST ══

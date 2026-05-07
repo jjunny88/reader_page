@@ -1198,44 +1198,25 @@ function buildAdminPages() {
         <span id="members-upload-arrow" style="margin-left:auto;font-size:12px;color:var(--text-muted)">▼ 펼치기</span>
       </div>
       <div id="members-upload-body" style="display:none">
-        <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <!-- 직책자 업로드 -->
-          <div>
-            <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:8px">👥 직책자 목록 업로드</div>
-            <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
-              컬럼: 순번 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책 | 직책급 | 직급 | 사원명 | 사번 | 회사메일 | 직책년차 | 비고 | 평가자
-            </div>
-            <div class="upload-zone" id="upload-zone"
-              onclick="document.getElementById('excel-file').click()"
-              ondragover="event.preventDefault();this.classList.add('drag')"
-              ondragleave="this.classList.remove('drag')"
-              ondrop="handleDrop(event)">
-              <div class="upload-icon">📊</div>
-              <div class="upload-text"><strong>직책자 엑셀 클릭 또는 드래그</strong></div>
-            </div>
-            <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)">
-            <div class="upload-result" id="upload-result"></div>
-            <button class="btn btn-accent btn-sm" style="margin-top:6px" onclick="downloadPersonsTemplate()">📥 양식 다운로드</button>
+        <div class="card-body">
+          <div class="alert alert-info" style="font-size:12px;margin-bottom:12px">
+            📌 하나의 엑셀 파일로 <strong>직책자 목록 + 계정 + 인사현황</strong>이 한 번에 반영됩니다.<br>
+            컬럼: <strong>순번 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책 | 직책급 | 직급 | 사원명 | 사번 | 회사메일 | 직책년차 | 비고 | 평가자 | 권한 | 비밀번호</strong><br>
+            <span style="color:var(--text-muted)">권한: <strong>person</strong>(직책자·기본값) / <strong>eval</strong>(평가자·부서장) / <strong>admin</strong>(관리자) &nbsp;·&nbsp; 비밀번호 비워두면 <strong>1111111</strong> 자동 설정</span>
           </div>
-          <!-- 계정 업로드 -->
-          <div>
-            <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:8px">🔐 계정 일괄 업로드</div>
-            <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
-              컬럼: 사번 | 이름 | 권한(admin/eval/person) | 소속 | 직책 | 비밀번호<br>
-              비밀번호 비워두면 1111111 자동 설정
-            </div>
-            <div class="upload-zone" onclick="document.getElementById('acc-file').click()"
-              ondragover="event.preventDefault();this.classList.add('drag')"
-              ondragleave="this.classList.remove('drag')"
-              ondrop="handleAccDrop(event)">
-              <div class="upload-icon">👥</div>
-              <div class="upload-text"><strong>계정 엑셀 클릭 또는 드래그</strong></div>
-            </div>
-            <input type="file" id="acc-file" accept=".xlsx,.xls" style="display:none" onchange="handleAccUpload(event)">
-            <div class="upload-result" id="upload-result-acc"></div>
-            <div style="display:flex;gap:6px;margin-top:6px">
-              <button class="btn btn-accent btn-sm" onclick="downloadAccountTemplate()">📥 양식 다운로드</button>
-            </div>
+          <div class="upload-zone" id="upload-zone"
+            onclick="document.getElementById('excel-file').click()"
+            ondragover="event.preventDefault();this.classList.add('drag')"
+            ondragleave="this.classList.remove('drag')"
+            ondrop="handleDrop(event)">
+            <div class="upload-icon">📊</div>
+            <div class="upload-text"><strong>인원 통합 엑셀 클릭 또는 드래그</strong><br>.xlsx / .xls 지원</div>
+          </div>
+          <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)">
+          <div class="upload-result" id="upload-result"></div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-accent btn-sm" onclick="downloadPersonsTemplate()">📥 통합 양식 다운로드</button>
+            <button class="btn btn-outline btn-sm" onclick="exportPersonsExcel()">📤 현재 목록 내보내기</button>
           </div>
         </div>
         <!-- 비밀번호 일괄 변경 -->
@@ -1287,7 +1268,6 @@ function buildAdminPages() {
               <th>직책</th>
               <th>권한</th>
               <th style="min-width:160px">체크 항목</th>
-              <th>인적사항</th>
               <th>담당 직책자</th>
               <th>관리</th>
             </tr></thead>
@@ -2181,7 +2161,7 @@ function handleExcelUpload(e){
   e.target.value='';
 }
 function parseExcel(file){
-  // 컬럼 순서: 순번(0) 회사명(1) 본부(2) 지점(3) 실/센터(4) 팀(5) 직책(6) 직책급(7) 직급(8) 사원명(9) 사번(10) 회사메일(11) 직책년차(12) 비고(13) 평가자(14)
+  // 컬럼: 순번(0) 회사명(1) 본부(2) 지점(3) 실/센터(4) 팀(5) 직책(6) 직책급(7) 직급(8) 사원명(9) 사번(10) 회사메일(11) 직책년차(12) 비고(13) 평가자(14) 권한(15) 비밀번호(16)
   const reader=new FileReader();
   reader.onload=function(e){
     try{
@@ -2193,56 +2173,61 @@ function parseExcel(file){
       const parsed=[];
       const warnings=[];
       let nextNo=1;
-      let newPersonAccounts=0;
+      let accCreated=0, accUpdated=0;
 
       for(let i=1;i<rows.length;i++){
         const r=rows[i];
         const rawName=String(r[9]||'').trim();
         if(!rawName)continue;
 
-        // 평가자 이름으로 계정 ID 매핑
-        const evalName=String(r[14]||'').trim();
-        const evalAcc=accounts.find(a=>a.name===evalName&&a.role==='eval');
-        if(evalName&&!evalAcc){
-          warnings.push(`${rawName}: 평가자 '${evalName}' 을 계정에서 찾을 수 없어 미지정 처리됨`);
+        const sabun    = String(r[10]||'').trim();
+        const role     = String(r[15]||'person').trim().toLowerCase() || 'person';
+        const pw       = String(r[16]||'').trim();
+        const evalName = String(r[14]||'').trim();
+
+        // 평가자 계정 매핑
+        const evalAcc = accounts.find(a=>a.name===evalName&&a.role==='eval');
+        if(evalName && !evalAcc){
+          warnings.push(`${rawName}: 평가자 '${evalName}' 계정 없음 → 미지정`);
         }
 
-        const sabun=String(r[10]||'').trim();
-
-        // 사번이 있으면 직책자 계정 자동 생성/업데이트
+        // 계정 자동 생성/업데이트
         if(sabun){
-          const existing=accounts.find(a=>a.id===sabun);
+          const existing = accounts.find(a=>a.id===sabun);
           if(!existing){
-            accounts.push({id:sabun, pw:'1111111', name:rawName, role:'person', dept:String(r[6]||'').trim()});
-            newPersonAccounts++;
-          } else if(existing.role==='person'){
-            // 이름 업데이트
-            existing.name=rawName;
+            accounts.push({
+              id:sabun, pw:pw||'1111111', name:rawName, role:role,
+              dept:String(r[2]||'').trim(), position:String(r[6]||'').trim(),
+            });
+            accCreated++;
+          } else {
+            existing.name=rawName; existing.role=role;
+            existing.dept=String(r[2]||'').trim();
+            existing.position=String(r[6]||'').trim();
+            if(pw) existing.pw=pw;
+            accUpdated++;
           }
         }
 
+        // eval/admin은 직책자 목록 제외
+        if(role==='eval'||role==='admin') continue;
+
         parsed.push({
-          no:nextNo++,
-          name:rawName,
-          sabun,
-          company:String(r[1]||'').trim(),
-          bonbu:String(r[2]||'').trim(),
-          jijum:String(r[3]||'').trim(),
-          sil:String(r[4]||'').trim(),
-          team:String(r[5]||'').trim(),
-          jikchek:String(r[6]||'').trim(),
-          jikchekgup:String(r[7]||'').trim(),
-          jikgup:String(r[8]||'').trim(),
-          email:String(r[11]||'').trim(),
-          nyeoncha:String(r[12]||'').trim(),
-          bigo:String(r[13]||'').trim(),
-          evaluatorId:evalAcc?evalAcc.id:'',
+          no:nextNo++, name:rawName, sabun,
+          company:String(r[1]||'').trim(), bonbu:String(r[2]||'').trim(),
+          jijum:String(r[3]||'').trim(), sil:String(r[4]||'').trim(),
+          team:String(r[5]||'').trim(), jikchek:String(r[6]||'').trim(),
+          jikchekgup:String(r[7]||'').trim(), jikgup:String(r[8]||'').trim(),
+          email:String(r[11]||'').trim(), nyeoncha:String(r[12]||'').trim(),
+          bigo:String(r[13]||'').trim(), evaluatorId:evalAcc?evalAcc.id:'',
         });
       }
 
-      if(parsed.length===0){showUploadResult('warn','유효한 데이터가 없습니다. 헤더 행 포함 2행 이상이어야 합니다.');return;}
+      if(parsed.length===0&&accCreated===0&&accUpdated===0){
+        showUploadResult('warn','유효한 데이터가 없습니다.');return;
+      }
 
-      // 전체 교체 — 기존 평가 데이터는 이름 기준으로 보존
+      // 직책자 전체 교체 — 기존 평가 데이터 보존
       const oldPersons=[...persons];
       persons=parsed;
       const newEvalData={};
@@ -2251,11 +2236,31 @@ function parseExcel(file){
         newEvalData[p.no]=old&&evalData[old.no]?evalData[old.no]:{g1:'',g2:'',g3:'',g4:'',g5:'',comment:'',cGrade:'',done:false};
       });
       evalData=newEvalData;
+
+      // hrPersons 자동 동기화
+      let hrSynced=0,hrAdded=0;
+      parsed.forEach(p=>{
+        const hrEntry={
+          '사번':p.sabun||'','이름':p.name,'회사':p.company||'',
+          '본부':p.bonbu||'','지점':p.jijum||'','실':p.sil||'','팀':p.team||'',
+          '직책':p.jikchek||'','직책급':p.jikchekgup||'','직급':p.jikgup||'',
+          '이메일':p.email||'','직책년차':p.nyeoncha||'','비고':p.bigo||'',
+        };
+        const ex=hrPersons.find(h=>
+          (p.sabun&&(h['사번']||'').toString().trim()===p.sabun)||
+          ((h['이름']||h['성명']||'').trim()===p.name)
+        );
+        if(ex){Object.assign(ex,hrEntry);hrSynced++;}
+        else{hrPersons.push(hrEntry);hrAdded++;}
+      });
+
       save();
       renderPersonsAdmin();
+      renderMembersAdmin();
 
-      let msg=`✅ ${parsed.length}명 업로드 완료`;
-      if(newPersonAccounts>0) msg+=` · 직책자 계정 ${newPersonAccounts}개 자동 생성 (초기 비밀번호: 1111111)`;
+      let msg=`✅ 직책자 <strong>${parsed.length}명</strong> 반영`;
+      msg+=`<br>👤 계정: 신규 <strong>${accCreated}개</strong> · 업데이트 <strong>${accUpdated}개</strong>`;
+      msg+=`<br>📋 인사현황: 업데이트 <strong>${hrSynced}명</strong> · 신규 <strong>${hrAdded}명</strong>`;
       if(warnings.length) msg+=`<br><span style="color:#b7791f">⚠️ ${warnings.join('<br>')}</span>`;
       showUploadResult(warnings.length?'warn':'ok',msg);
     }catch(err){
@@ -2264,16 +2269,43 @@ function parseExcel(file){
   };
   reader.readAsBinaryString(file);
 }
+
 // ══ 직책자 양식 다운로드 ══
 function downloadPersonsTemplate() {
   const wb = XLSX.utils.book_new();
-  const headers = ['순번','회사명','본부','지점','실/센터','팀','직책','직책급','직급','사원명','사번','회사메일','직책년차','비고','평가자'];
-  const sample1 = [1,'이투스기술학원','O2O플랫폼사업본부','이투스기술학원','전략실','전략담임팀','팀장','1급','차장','홍길동','EMP001','hong@company.com','2년차 1분기','','곽용호'];
-  const ws = XLSX.utils.aoa_to_sheet([headers, sample1]);
-  ws['!cols'] = headers.map((_,i) => ({wch: i===14?14 : i===10||i===11?16 : 12}));
-  XLSX.utils.book_append_sheet(wb, ws, '직책자목록');
-  XLSX.writeFile(wb, '직책자_업로드_양식.xlsx');
-  showToast('📥 직책자 양식 다운로드 완료!');
+  const headers = ['순번','회사명','본부','지점','실/센터','팀','직책','직책급','직급','사원명','사번','회사메일','직책년차','비고','평가자','권한','비밀번호'];
+  const sample1 = [1,'이투스기술학원','O2O플랫폼사업본부','이투스기술학원','전략실','전략담임팀','팀장','1급','차장','홍길동','EMP001','hong@company.com','2년차 1분기','','곽용호','person',''];
+  const sample2 = [2,'이투스기술학원','O2O플랫폼사업본부','이투스기술학원','','','본부장','','부장','곽용호','EMP002','kwak@company.com','','','','eval','pass1234'];
+  const ws = XLSX.utils.aoa_to_sheet([headers, sample1, sample2]);
+  ws['!cols'] = headers.map((_,i) => ({wch: i===16?12 : i===15?8 : i===14?12 : i===10||i===11?16 : 12}));
+  // 안내 주석
+  if(!ws['P1']) ws['P1']={t:'s',v:'권한'};
+  if(!ws['P1'].c) ws['P1'].c=[];
+  ws['P1'].c.push({a:'System', t:'person=직책자 / eval=평가자(부서장) / admin=관리자\n비워두면 person으로 자동 설정'});
+  if(!ws['Q1']) ws['Q1']={t:'s',v:'비밀번호'};
+  if(!ws['Q1'].c) ws['Q1'].c=[];
+  ws['Q1'].c.push({a:'System', t:'비워두면 1111111 자동 설정'});
+  XLSX.utils.book_append_sheet(wb, ws, '인원목록');
+
+  // 안내 시트
+  const guide = XLSX.utils.aoa_to_sheet([
+    ['[통합 업로드 안내]'],[''],
+    ['권한(15번 컬럼)'],
+    ['  person  = 직책자 (피평가자) — 비워두면 자동'],
+    ['  eval    = 평가자 (부서장)'],
+    ['  admin   = 관리자'],[''],
+    ['비밀번호(16번 컬럼)'],
+    ['  비워두면 초기 비밀번호 1111111 자동 설정'],[''],
+    ['평가자(14번 컬럼)'],
+    ['  eval 권한 계정의 이름과 일치해야 자동 매핑됨'],[''],
+    ['업로드 효과'],
+    ['  1. persons (직책자 목록) 업데이트'],
+    ['  2. accounts (로그인 계정) 자동 생성/업데이트'],
+    ['  3. hrPersons (인적사항 목록) 자동 동기화'],
+  ]);
+  XLSX.utils.book_append_sheet(wb, guide, '작성안내');
+  XLSX.writeFile(wb, '인원_통합업로드_양식.xlsx');
+  showToast('📥 통합 양식 다운로드 완료!');
 }
 
 // ══ 직책자 현재 목록 내보내기 ══
@@ -5072,12 +5104,6 @@ function renderMembersAdmin() {
           </label>
         </div>
       </td>
-      <td>
-        ${inHr
-          ? '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;background:#e8f5e9;color:#2e7d32;font-weight:600">✓ 포함</span>'
-          : (a.role==='admin' ? '-' : '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;background:#eee;color:#999;font-weight:600">– 미포함</span>')
-        }
-      </td>
       <td style="font-size:12px">${cnt !== null ? cnt+'명' : '-'}</td>
       <td>
         <div style="display:flex;gap:4px">
@@ -5100,7 +5126,7 @@ function renderMembersAdmin() {
   if (existingTr) existingTr.remove();
   const summaryTr = document.createElement('tr');
   summaryTr.id = 'members-summary-row';
-  summaryTr.innerHTML = `<td colspan="9" style="background:#f0f3f8;padding:8px 14px;font-size:11px;color:var(--text-muted);text-align:left">
+  summaryTr.innerHTML = `<td colspan="8" style="background:#f0f3f8;padding:8px 14px;font-size:11px;color:var(--text-muted);text-align:left">
     총 ${total}명 표시 중 · 인적사항 포함 ${inHrCnt}명 · 미포함 ${total-inHrCnt}명
     <span style="margin-left:12px;color:#b7791f">※ 흐린 행 = 인적사항 미포함</span>
   </td>`;

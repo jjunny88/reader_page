@@ -470,11 +470,15 @@ textarea.comment:focus{outline:none;border-color:var(--primary-light);}
         <select class="form-input" id="fa-role">
           <option value="eval">평가자 (부서장)</option>
           <option value="admin">관리자</option>
+          <option value="ceo">관리자 (대표)</option>
           <option value="person">피평가자 (직책자)</option>
         </select>
       </div>
     </div>
-    <div class="form-row"><label class="form-label">소속</label><input class="form-input" id="fa-dept" placeholder="예: 이투스기술"></div>
+    <div class="form-grid">
+      <div class="form-row"><label class="form-label">본부</label><input class="form-input" id="fa-dept" placeholder="예: ECI"></div>
+      <div class="form-row"><label class="form-label">지점</label><input class="form-input" id="fa-position-dept" placeholder="예: ECI(본)"></div>
+    </div>
     <div class="form-row"><label class="form-label">직책</label><input class="form-input" id="fa-position" placeholder="예: 본부장"></div>
     <div class="form-row" id="fa-hrview-row" style="display:none">
       <label class="form-label">인적사항 조회 권한</label>
@@ -571,6 +575,17 @@ async function load() {
     // 인적사항
     const hrDoc = await db.collection('hr').doc('persons').get();
     hrPersons = hrDoc.exists ? hrDoc.data().list : [];
+    // 이름 없는 행 자동 정리
+    const hrBefore = hrPersons.length;
+    hrPersons = hrPersons.filter(h => {
+      const name = (h['이름']||h['성명']||'').trim();
+      return name && name !== '-';
+    });
+    // 정리된 경우 Firebase에 다시 저장
+    if (hrPersons.length < hrBefore) {
+      db.collection('hr').doc('persons').set({list: hrPersons}).catch(()=>{});
+      console.log(`hrPersons 정리: ${hrBefore}명 → ${hrPersons.length}명`);
+    }
 
     // PDF URL 맵 (Firestore에서 로드)
     const hrPdfsSnap = await db.collection('hrPdfs').get();
@@ -597,6 +612,7 @@ async function load() {
     persons   = JSON.parse(localStorage.getItem('per26')    || 'null') || DEFAULT_PERSONS;
     evalData  = JSON.parse(localStorage.getItem(getActiveKey()) || localStorage.getItem('eval26q1') || '{}');
     hrPersons = JSON.parse(localStorage.getItem('hr_persons') || '[]');
+    hrPersons = hrPersons.filter(h => { const n=(h['이름']||h['성명']||'').trim(); return n && n!=='-'; });
     hrPdfs    = JSON.parse(localStorage.getItem('hr_pdfs')    || '{}');
     hrExtra   = JSON.parse(localStorage.getItem('hr_extra')   || '{}');
     persons.forEach(p => {
@@ -698,13 +714,13 @@ function initApp() {
   const u = currentUser;
   document.getElementById('sb-uname').textContent = u.name;
   document.getElementById('sb-uid').textContent = (u.position||u.dept||'') + ' · 사번: ' + u.id;
-  const roleLabel = {admin:'👑 관리자', eval:'👤 평가자(부서장)', person:'🏷️ 피평가자(직책자)'}[u.role]||'👤';
+  const roleLabel = {admin:'👑 관리자', ceo:'👔 관리자(대표)', eval:'👤 평가자(부서장)', person:'🏷️ 피평가자(직책자)'}[u.role]||'👤';
   document.getElementById('sb-role-tag').textContent = roleLabel;
-  document.getElementById('cur-user-badge').textContent = u.name + ' (' + (u.role==='admin'?'관리자':u.role==='eval'?'평가자(부서장)':'피평가자(직책자)') + ')';
-  document.getElementById('cur-user-badge').className = 'badge ' + (u.role==='admin'?'badge-gold':u.role==='eval'?'badge-purple':'badge-blue');
+  document.getElementById('cur-user-badge').textContent = u.name + ' (' + (u.role==='admin'?'관리자':u.role==='ceo'?'관리자(대표)':u.role==='eval'?'평가자(부서장)':'피평가자(직책자)') + ')';
+  document.getElementById('cur-user-badge').className = 'badge ' + ((u.role==='admin'||u.role==='ceo')?'badge-gold':u.role==='eval'?'badge-purple':'badge-blue');
 
-  // 소속 표시: eval/person은 본인 소속, admin은 '관리자'
-  const userOrg = u.role==='admin' ? '관리자' : (u.dept||u.jijum||'');
+  // 소속 표시
+  const userOrg = (u.role==='admin'||u.role==='ceo') ? '관리자' : (u.dept||u.jijum||'');
   const subEl = document.getElementById('app-sidebar-sub');
   if (subEl) subEl.textContent = userOrg;
 
@@ -722,16 +738,24 @@ function initApp() {
     {page:'eval-analysis', icon:'📈', label:'평가 분석'},
     {section:'인사현황'},
     {page:'hr-list',    icon:'👤', label:'인적사항 목록'},
-    {page:'hr-upload',  icon:'📂', label:'인사 데이터 업로드'},
     {section:'관리'},
     {page:'members',    icon:'👥', label:'인원 통합 관리'},
     {section:'기준'},
     {page:'criteria',   icon:'📌', label:'등급 기준'},
   ];
+  const ceoMenus = [
+    {section:'현황'},
+    {page:'dashboard',     icon:'📡', label:'접속 현황'},
+    {page:'eval-analysis', icon:'📈', label:'평가 분석'},
+    {section:'인사현황'},
+    {page:'hr-list',       icon:'👤', label:'인적사항 목록'},
+    {section:'기준'},
+    {page:'criteria',      icon:'📌', label:'등급 기준'},
+  ];
   const evalMenus = [
     {section:'평가'},
-    {page:'my-overview', icon:'📋', label:'담당 직책자 현황'},
-    {page:'eval',        icon:'✏️',  label:'평가 입력'},
+    {page:'my-overview', icon:'📋', label:'평가 대상 직책자 현황'},
+    // {page:'eval',        icon:'✏️',  label:'평가 입력'}, // 오픈 전 비활성화
     ...(u.hrView ? [
       {section:'인사현황'},
       {page:'hr-list', icon:'👤', label:'인적사항 목록'},
@@ -745,7 +769,7 @@ function initApp() {
     {section:'기준'},
     {page:'criteria',     icon:'📌', label:'등급 기준'},
   ];
-  const menus = u.role==='admin' ? adminMenus : u.role==='eval' ? evalMenus : personMenus;
+  const menus = u.role==='admin' ? adminMenus : u.role==='ceo' ? ceoMenus : u.role==='eval' ? evalMenus : personMenus;
   menus.forEach(m => {
     if (m.section) {
       nav.innerHTML += `<div class="nav-section">${m.section}</div>`;
@@ -756,10 +780,11 @@ function initApp() {
 
   const content = document.getElementById('main-content');
   if (u.role==='admin') content.innerHTML = buildAdminPages() + buildHrPages();
+  else if (u.role==='ceo') content.innerHTML = buildHrPages() + buildCeoPages();
   else if (u.role==='eval') content.innerHTML = buildEvalPages() + (u.hrView ? buildHrListPage() : '');
   else content.innerHTML = buildPersonPages();
 
-  const firstPage = u.role==='admin' ? 'overview' : u.role==='eval' ? 'my-overview' : 'my-dashboard';
+  const firstPage = u.role==='admin' ? 'overview' : u.role==='ceo' ? 'dashboard' : u.role==='eval' ? 'my-overview' : 'my-dashboard';
   showPage(firstPage);
   if (u.role==='admin') updateQuarterUI();
 }
@@ -1201,8 +1226,8 @@ function buildAdminPages() {
         <div class="card-body">
           <div class="alert alert-info" style="font-size:12px;margin-bottom:12px">
             📌 하나의 엑셀 파일로 <strong>직책자 목록 + 계정 + 인사현황</strong>이 한 번에 반영됩니다.<br>
-            컬럼: <strong>순번 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책 | 직책급 | 직급 | 사원명 | 사번 | 회사메일 | 직책년차 | 비고 | 평가자 | 권한 | 비밀번호</strong><br>
-            <span style="color:var(--text-muted)">권한: <strong>person</strong>(직책자·기본값) / <strong>eval</strong>(평가자·부서장) / <strong>admin</strong>(관리자) &nbsp;·&nbsp; 비밀번호 비워두면 <strong>1111111</strong> 자동 설정</span>
+            컬럼: <strong>순번 | 회사명 | 본부 | 지점 | 실/센터 | 팀 | 직책 | 직책급 | 직급 | 사원명 | 사번 | 회사메일 | 직책년차 | 비고 | 담당부서장 | 권한 | 비밀번호</strong><br>
+            <span style="color:var(--text-muted)">권한: <strong>person</strong>(직책자·기본값) / <strong>eval</strong>(부서장·평가자) / <strong>admin</strong>(관리자) &nbsp;·&nbsp; 비밀번호 비워두면 <strong>1111111</strong> 자동 설정</span>
           </div>
           <div class="upload-zone" id="upload-zone"
             onclick="document.getElementById('excel-file').click()"
@@ -1232,6 +1257,60 @@ function buildAdminPages() {
           <input type="file" id="pw-file" accept=".xlsx,.xls" style="display:none" onchange="handlePwUpload(event)">
           <div class="upload-result" id="upload-result-pw"></div>
         </div>
+
+        <!-- 인적사항 엑셀 업로드 -->
+        <div class="card-body" style="border-top:1px solid var(--border);padding-top:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:700;color:var(--primary)">👤 인적사항 엑셀 업로드</span>
+            <span style="font-size:11px;color:var(--text-muted)" id="members-hr-persons-cnt">${hrPersons.length}명 등록됨</span>
+            <button class="btn btn-accent btn-sm" style="margin-left:auto" onclick="downloadHrTemplate()">📥 양식 다운로드</button>
+          </div>
+          <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
+            필수 컬럼: <strong>이름</strong> (사번 있으면 함께) · 평가항목 컬럼 포함 · 업로드 후 목록에 자동 반영
+          </div>
+          <div class="upload-zone" style="padding:16px"
+            onclick="document.getElementById('f-hr-persons-m').click()"
+            ondragover="event.preventDefault();this.classList.add('drag')"
+            ondragleave="this.classList.remove('drag')"
+            ondrop="hrPersonsDropM(event)">
+            <div class="upload-icon" style="font-size:24px">📋</div>
+            <div class="upload-text"><strong>인적사항 엑셀 클릭 또는 드래그</strong><br>.xlsx / .xls</div>
+          </div>
+          <input type="file" id="f-hr-persons-m" accept=".xlsx,.xls" style="display:none" onchange="hrPersonsUploadM(event)">
+          <div class="upload-result" id="r-hr-persons-m"></div>
+        </div>
+
+        <!-- 과거 평가 데이터 업로드 -->
+        <div class="card-body" style="border-top:1px solid var(--border);padding-top:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:700;color:var(--primary)">📊 과거 평가 데이터 업로드</span>
+            <button class="btn btn-accent btn-sm" style="margin-left:auto" onclick="downloadPastEvalTemplate()">📥 양식 다운로드</button>
+          </div>
+          <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
+            필수 컬럼: <strong>사번</strong>(또는 이름) · <strong>항목1~5</strong> · <strong>서술</strong>(선택)<br>
+            점수: 100/90/80/70/60/50 또는 등급: S/A/B/C/D/E
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <span style="font-size:12px;font-weight:600;color:var(--primary)">업로드 대상 분기:</span>
+            <select id="past-eval-year-m" class="form-input" style="width:90px;padding:5px 8px;font-size:12px" onchange="updatePastEvalBadgeM()">
+              ${[2024,2025,2026].map(y=>`<option value="${y}"${y===2025?' selected':''}>${y}년</option>`).join('')}
+            </select>
+            <select id="past-eval-quarter-m" class="form-input" style="width:80px;padding:5px 8px;font-size:12px" onchange="updatePastEvalBadgeM()">
+              ${[1,2,3,4].map(q=>`<option value="${q}"${q===2?' selected':''}>${q}분기</option>`).join('')}
+            </select>
+            <span id="past-eval-target-badge-m" style="font-size:12px;font-weight:700;color:var(--accent);padding:3px 10px;background:#fff8e1;border-radius:20px;border:1px solid var(--accent)">→ eval_2025_Q2</span>
+          </div>
+          <div class="upload-zone" style="padding:16px"
+            onclick="document.getElementById('f-past-eval-m').click()"
+            ondragover="event.preventDefault();this.classList.add('drag')"
+            ondragleave="this.classList.remove('drag')"
+            ondrop="pastEvalDropM(event)">
+            <div class="upload-icon" style="font-size:24px">📊</div>
+            <div class="upload-text"><strong>과거 평가 엑셀 클릭 또는 드래그</strong><br>.xlsx / .xls</div>
+          </div>
+          <input type="file" id="f-past-eval-m" accept=".xlsx,.xls" style="display:none" onchange="pastEvalUploadM(event)">
+          <div class="upload-result" id="r-past-eval-m"></div>
+        </div>
       </div>
     </div>
 
@@ -1243,6 +1322,7 @@ function buildAdminPages() {
           <select id="members-filter-role" onchange="renderMembersAdmin()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
             <option value="">전체 권한</option>
             <option value="admin">관리자</option>
+            <option value="ceo">관리자(대표)</option>
             <option value="eval">평가자</option>
             <option value="person">직책자</option>
           </select>
@@ -1264,11 +1344,14 @@ function buildAdminPages() {
             <thead><tr>
               <th>사번</th>
               <th>이름</th>
-              <th>소속</th>
+              <th>본부</th>
+              <th>지점</th>
               <th>직책</th>
+              <th>직급</th>
               <th>권한</th>
               <th style="min-width:160px">체크 항목</th>
-              <th>담당 직책자</th>
+              <th>평가 대상 직책자</th>
+              <th style="min-width:200px">PDF 업로드</th>
               <th>관리</th>
             </tr></thead>
             <tbody id="members-tbody"></tbody>
@@ -1298,7 +1381,7 @@ function buildEvalPages() {
       <div class="stat-card"><div class="stat-label">팀장</div><div class="stat-val" id="my-stat-teamjang" style="color:var(--primary)">-</div><div class="stat-sub">팀장 직책</div></div>
     </div>
 
-    <!-- 평가 현황 -->
+    <!-- 평가 현황 — 오픈 전 비활성화
     <div class="card" style="margin-bottom:16px">
       <div class="card-header">
         <div style="display:flex;align-items:center;gap:8px">
@@ -1319,6 +1402,7 @@ function buildEvalPages() {
         </div>
       </div>
     </div>
+    -->
 
     <!-- 직책자 테이블 -->
     <div class="card">
@@ -1326,14 +1410,14 @@ function buildEvalPages() {
         <span class="card-title">■ 부서 내 직책자 현황</span>
         <div style="margin-left:auto;display:flex;gap:8px">
           <button class="btn btn-outline btn-sm" onclick="showPage('hr-list')">👥 전체 직책자 현황</button>
-          <button class="btn btn-accent btn-sm" onclick="showPage('eval')">✏️ 평가 입력하기</button>
+          <!-- <button class="btn btn-accent btn-sm" onclick="showPage('eval')">✏️ 평가 입력하기</button> --> <!-- 오픈 전 비활성화 -->
         </div>
       </div>
       <div class="card-body">
         <div class="tbl-wrap"><table id="my-overview-table">
           <thead><tr>
             <th>순번</th><th>이름</th><th>본부</th><th>실/센터</th><th>팀</th><th>직급</th><th>직책</th><th>직책년차</th>
-            <th style="background:#e8b84b;color:#1a3a5c;width:90px">평가</th>
+            <!-- <th style="background:#e8b84b;color:#1a3a5c;width:90px">평가</th> 오픈 전 비활성화 -->
             <th style="background:#3266AD;color:#fff;width:90px">인적사항</th>
           </tr></thead>
           <tbody id="my-overview-tbody"></tbody>
@@ -1438,8 +1522,14 @@ function buildCriteriaHtml() {
 }
 
 // ══════════════════════
-//  PAGE BUILDER: PERSON (직책자)
+//  PAGE BUILDER: CEO (관리자·대표)
 // ══════════════════════
+function buildCeoPages() {
+  // admin 페이지 전체를 빌드하되, CEO는 메뉴가 제한되므로 페이지 HTML은 공유
+  return buildAdminPages() + buildHrPages();
+}
+
+
 function buildPersonPages() {
   return `
   <div class="page" id="page-my-dashboard">
@@ -1604,14 +1694,14 @@ function showPage(name) {
   const titles = {
     'overview':'직책자 현황', 'result':'전체 평가 결과', 'persons':'직책자 관리',
     'accounts':'계정 관리', 'members':'인원 통합 관리', 'criteria':'등급 기준',
-    'my-overview':'담당 직책자 현황', 'eval':'평가 입력',
+    'my-overview':'평가 대상 직책자 현황', 'eval':'평가 입력',
     'my-dashboard':'내 평가 결과',
-    'hr-list':'인적사항 목록', 'hr-upload':'인사 데이터 업로드', 'hr-detail':'개인 상세 카드',
+    'hr-list':'인적사항 목록', 'hr-detail':'개인 상세 카드',
     'dashboard':'접속 현황', 'eval-analysis':'평가 분석',
   };
   document.getElementById('topbar-title').textContent = titles[name] || name;
   // topbar-sub는 소속 유지
-  const userOrg2 = currentUser.role==='admin' ? '관리자' : (currentUser.dept||currentUser.jijum||'');
+  const userOrg2 = (currentUser.role==='admin'||currentUser.role==='ceo') ? '관리자' : (currentUser.dept||currentUser.jijum||'');
   const ts = document.getElementById('topbar-sub');
   if (ts) ts.textContent = userOrg2;
 
@@ -1626,7 +1716,6 @@ function showPage(name) {
   if (name==='eval')        renderEvalForm();
   if (name==='my-dashboard')renderMyDashboard();
   if (name==='hr-list')     { hrFilterBonbu = null; renderHrList(); }
-  if (name==='hr-upload')   renderHrUpload();
 }
 
 // ══════════════════════
@@ -1818,8 +1907,8 @@ function renderAccountsAdmin() {
   tb.innerHTML = '';
   accounts.forEach(a=>{
     const cnt = a.role==='eval' ? persons.filter(p=>p.evaluatorId===a.id).length : '-';
-    const roleLabel = {admin:'관리자', eval:'평가자(부서장)', person:'피평가자(직책자)'}[a.role]||a.role;
-    const roleCls   = {admin:'role-admin', eval:'role-eval', person:'role-person'}[a.role]||'';
+    const roleLabel = {admin:'관리자', ceo:'관리자(대표)', eval:'평가자(부서장)', person:'피평가자(직책자)'}[a.role]||a.role;
+    const roleCls   = {admin:'role-admin', ceo:'role-admin', eval:'role-eval', person:'role-person'}[a.role]||'';
     const hrBadge = a.role==='eval'
       ? (a.hrView
           ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">✅ 허용</span>'
@@ -1917,14 +2006,13 @@ function renderMyOverview() {
         <td>${p.sil}</td><td>${p.team}</td>
         <td>${p.jikgup}</td><td>${p.jikchek}</td>
         <td style="font-size:11px">${p.nyeoncha}</td>
+        <!-- 평가 td 오픈 전 비활성화
         <td style="text-align:center">
           ${d.done
             ? `<span class="complete-chip chip-done" style="font-size:11px;font-weight:600">✅ 완료</span>`
-            : `<a href="#" onclick="showPage('eval');return false;"
-                style="display:inline-block;padding:3px 10px;background:#ffebee;color:#c62828;
-                border:1.5px solid #ef9a9a;border-radius:20px;font-size:11px;font-weight:700;
-                text-decoration:none">평가하기</a>`}
+            : `<span style="font-size:11px;color:var(--text-muted)">준비중</span>`}
         </td>
+        -->
         <td style="text-align:center">
           ${currentUser.hrView
             ? `<button onclick="showHrDetail('${sabunEnc}','${nameEnc}')"
@@ -2101,12 +2189,13 @@ function openAModal(id) {
     document.getElementById('fa-name').value=a.name;
     document.getElementById('fa-role').value=a.role;
     document.getElementById('fa-dept').value=a.dept||'';
+    document.getElementById('fa-position-dept').value=a.jijum||'';
     document.getElementById('fa-position').value=a.position||'';
     document.getElementById('fa-hrview').checked=!!(a.hrView);
     const hrRow=document.getElementById('fa-hrview-row');
     if(hrRow) hrRow.style.display=a.role==='eval'?'block':'none';
   } else {
-    ['fa-id','fa-pw','fa-name','fa-dept','fa-position'].forEach(i=>document.getElementById(i).value='');
+    ['fa-id','fa-pw','fa-name','fa-dept','fa-position-dept','fa-position'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('fa-id').disabled=false;
     document.getElementById('fa-role').value='eval';
     document.getElementById('fa-hrview').checked=false;
@@ -2124,19 +2213,20 @@ function saveAccount(){
   const pw=document.getElementById('fa-pw').value;
   const name=document.getElementById('fa-name').value.trim();
   const role=document.getElementById('fa-role').value;
-  const dept=document.getElementById('fa-dept').value;
-  const position=document.getElementById('fa-position').value;
+  const dept=document.getElementById('fa-dept').value.trim();
+  const jijum=document.getElementById('fa-position-dept').value.trim();
+  const position=document.getElementById('fa-position').value.trim();
   const hrView=document.getElementById('fa-hrview').checked;
   if(!id||!name){showToast('사번과 이름을 입력하세요.');return;}
   if(editingAccountId){
     const idx=accounts.findIndex(a=>a.id===editingAccountId);
-    accounts[idx]={...accounts[idx],name,role,dept,position,hrView};
+    accounts[idx]={...accounts[idx],name,role,dept,jijum,position,hrView};
     if(pw) accounts[idx].pw=pw;
     showToast('✅ 계정이 수정되었습니다.');
   } else {
     if(!pw){showToast('비밀번호를 입력하세요.');return;}
     if(accounts.find(a=>a.id===id)){showToast('이미 존재하는 사번입니다.');return;}
-    accounts.push({id,pw,name,role,dept,position,hrView});
+    accounts.push({id,pw,name,role,dept,jijum,position,hrView});
     showToast('✅ 계정이 추가되었습니다.');
   }
   save(); closeAModal(); renderAccountsAdmin(); renderMembersAdmin();
@@ -2161,7 +2251,7 @@ function handleExcelUpload(e){
   e.target.value='';
 }
 function parseExcel(file){
-  // 컬럼: 순번(0) 회사명(1) 본부(2) 지점(3) 실/센터(4) 팀(5) 직책(6) 직책급(7) 직급(8) 사원명(9) 사번(10) 회사메일(11) 직책년차(12) 비고(13) 평가자(14) 권한(15) 비밀번호(16)
+  // 컬럼: 순번(0) 회사명(1) 본부(2) 지점(3) 실/센터(4) 팀(5) 직책(6) 직책급(7) 직급(8) 사원명(9) 사번(10) 회사메일(11) 직책년차(12) 비고(13) 담당부서장(14) 권한(15) 비밀번호(16)
   const reader=new FileReader();
   reader.onload=function(e){
     try{
@@ -2209,8 +2299,8 @@ function parseExcel(file){
           }
         }
 
-        // eval/admin은 직책자 목록 제외
-        if(role==='eval'||role==='admin') continue;
+        // eval/admin/ceo는 직책자 목록 제외
+        if(role==='eval'||role==='admin'||role==='ceo') continue;
 
         parsed.push({
           no:nextNo++, name:rawName, sabun,
@@ -2237,9 +2327,10 @@ function parseExcel(file){
       });
       evalData=newEvalData;
 
-      // hrPersons 자동 동기화
+      // hrPersons 자동 동기화 — 이름 없는 행 제외
       let hrSynced=0,hrAdded=0;
       parsed.forEach(p=>{
+        if(!p.name || p.name==='-' || p.name==='') return; // 이름 없으면 제외
         const hrEntry={
           '사번':p.sabun||'','이름':p.name,'회사':p.company||'',
           '본부':p.bonbu||'','지점':p.jijum||'','실':p.sil||'','팀':p.team||'',
@@ -2273,7 +2364,7 @@ function parseExcel(file){
 // ══ 직책자 양식 다운로드 ══
 function downloadPersonsTemplate() {
   const wb = XLSX.utils.book_new();
-  const headers = ['순번','회사명','본부','지점','실/센터','팀','직책','직책급','직급','사원명','사번','회사메일','직책년차','비고','평가자','권한','비밀번호'];
+  const headers = ['순번','회사명','본부','지점','실/센터','팀','직책','직책급','직급','사원명','사번','회사메일','직책년차','비고','담당부서장','권한','비밀번호'];
   const sample1 = [1,'이투스기술학원','O2O플랫폼사업본부','이투스기술학원','전략실','전략담임팀','팀장','1급','차장','홍길동','EMP001','hong@company.com','2년차 1분기','','곽용호','person',''];
   const sample2 = [2,'이투스기술학원','O2O플랫폼사업본부','이투스기술학원','','','본부장','','부장','곽용호','EMP002','kwak@company.com','','','','eval','pass1234'];
   const ws = XLSX.utils.aoa_to_sheet([headers, sample1, sample2]);
@@ -2281,7 +2372,7 @@ function downloadPersonsTemplate() {
   // 안내 주석
   if(!ws['P1']) ws['P1']={t:'s',v:'권한'};
   if(!ws['P1'].c) ws['P1'].c=[];
-  ws['P1'].c.push({a:'System', t:'person=직책자 / eval=평가자(부서장) / admin=관리자\n비워두면 person으로 자동 설정'});
+  ws['P1'].c.push({a:'System', t:'person=직책자 / eval=부서장(평가자) / admin=관리자\n비워두면 person으로 자동 설정'});
   if(!ws['Q1']) ws['Q1']={t:'s',v:'비밀번호'};
   if(!ws['Q1'].c) ws['Q1'].c=[];
   ws['Q1'].c.push({a:'System', t:'비워두면 1111111 자동 설정'});
@@ -2292,11 +2383,11 @@ function downloadPersonsTemplate() {
     ['[통합 업로드 안내]'],[''],
     ['권한(15번 컬럼)'],
     ['  person  = 직책자 (피평가자) — 비워두면 자동'],
-    ['  eval    = 평가자 (부서장)'],
+    ['  eval    = 부서장 (평가자)'],
     ['  admin   = 관리자'],[''],
     ['비밀번호(16번 컬럼)'],
     ['  비워두면 초기 비밀번호 1111111 자동 설정'],[''],
-    ['평가자(14번 컬럼)'],
+    ['담당부서장(14번 컬럼)'],
     ['  eval 권한 계정의 이름과 일치해야 자동 매핑됨'],[''],
     ['업로드 효과'],
     ['  1. persons (직책자 목록) 업데이트'],
@@ -2310,7 +2401,7 @@ function downloadPersonsTemplate() {
 
 // ══ 직책자 현재 목록 내보내기 ══
 function exportPersonsExcel() {
-  const headers = ['순번','회사명','본부','지점','실/센터','팀','직책','직책급','직급','사원명','사번','회사메일','직책년차','비고','평가자'];
+  const headers = ['순번','회사명','본부','지점','실/센터','팀','직책','직책급','직급','사원명','사번','회사메일','직책년차','비고','담당부서장'];
   const rows = [headers];
   persons.forEach((p,i) => {
     rows.push([
@@ -2596,10 +2687,19 @@ function buildHrListPage() {
     <div class="card">
       <div class="card-header">
         <span class="card-title">👤 직책자 인적사항 목록</span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:var(--text-muted)" id="hr-list-persons-cnt"></span>
+          <button class="btn btn-accent btn-sm" onclick="downloadHrTemplate()">📥 양식 다운로드</button>
+          <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0">
+            📋 엑셀 업로드
+            <input type="file" accept=".xlsx,.xls" style="display:none" onchange="hrPersonsUploadFromList(event)">
+          </label>
+        </div>
       </div>
       <div class="card-body">
         <!-- 소속 탭 필터 -->
         <div id="hr-tab-filter" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)"></div>
+        <div id="hr-upload-result-list"></div>
         <div id="hr-list-wrap"><div class="alert alert-info">인적사항 엑셀 업로드 후 목록이 표시됩니다.</div></div>
       </div>
     </div>
@@ -2611,78 +2711,7 @@ function buildHrListPage() {
 
 // ── 업로드 페이지 HTML (관리자용) ──
 function buildHrPages() {
-  return buildHrListPage() + `
-  <div class="page" id="page-hr-upload">
-
-    <!-- STEP 1: 인적사항 엑셀 -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">📋 STEP 1 · 인적사항 엑셀 업로드</span>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <button class="btn btn-accent btn-sm" onclick="downloadHrTemplate()">📥 양식 다운로드</button>
-          <span style="font-size:11px;color:var(--text-muted)" id="hr-persons-cnt">${hrPersons.length}명 등록됨</span>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="alert alert-info" style="font-size:11px;margin-bottom:10px">
-          📌 양식을 먼저 다운로드하여 작성 후 업로드하세요.<br>
-          필수 컬럼: <strong>이름</strong> (사번 있으면 함께) · 평가항목 컬럼 포함 · 업로드 후 PDF 슬롯 자동 생성
-        </div>
-        <div class="upload-zone" onclick="document.getElementById('f-hr-persons').click()"
-          ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
-          ondrop="hrPersonsDrop(event)">
-          <div class="upload-icon">📋</div>
-          <div class="upload-text"><strong>인적사항 엑셀 클릭 또는 드래그</strong><br>.xlsx / .xls</div>
-        </div>
-        <input type="file" id="f-hr-persons" accept=".xlsx,.xls" style="display:none" onchange="hrPersonsUpload(event)">
-        <div class="upload-result" id="r-hr-persons"></div>
-      </div>
-    </div>
-
-    <!-- STEP 2: 인원별 PDF 업로드 슬롯 -->
-    <div id="hr-pdf-slots"></div>
-
-    <!-- STEP 3: 과거 평가 데이터 업로드 -->
-    <div class="card" style="margin-top:16px">
-      <div class="card-header">
-        <span class="card-title">📊 STEP 3 · 과거 평가 데이터 업로드</span>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <button class="btn btn-accent btn-sm" onclick="downloadPastEvalTemplate()">📥 양식 다운로드</button>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="alert alert-info" style="font-size:11px;margin-bottom:12px">
-          📌 분기별로 파일을 하나씩 업로드하세요. 업로드한 데이터는 개인 상세 카드 리더십 역량에 자동 반영됩니다.<br>
-          필수 컬럼: <strong>사번</strong> (또는 이름) · <strong>항목1~5</strong> (소속/년도별 평가 항목명) · <strong>서술</strong> (부서장 서술, 선택)<br>
-          점수 입력: 100 / 90 / 80 / 70 / 60 / 50 (10점 단위) · 등급 입력도 가능: S / A / B / C / D / E
-        </div>
-
-        <!-- 분기 선택 -->
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-          <span style="font-size:13px;font-weight:600;color:var(--primary)">업로드 대상 분기:</span>
-          <select id="past-eval-year" class="form-input" style="width:90px;padding:6px 8px" onchange="updatePastEvalBadge()">
-            ${[2024,2025,2026].map(y=>`<option value="${y}"${y===2025?' selected':''}>${y}년</option>`).join('')}
-          </select>
-          <select id="past-eval-quarter" class="form-input" style="width:80px;padding:6px 8px" onchange="updatePastEvalBadge()">
-            ${[1,2,3,4].map(q=>`<option value="${q}"${q===2?' selected':''}>${q}분기</option>`).join('')}
-          </select>
-          <span id="past-eval-target-badge" style="font-size:12px;font-weight:700;color:var(--accent);padding:4px 12px;background:#fff8e1;border-radius:20px;border:1px solid var(--accent)">
-            → eval_2025_Q2
-          </span>
-        </div>
-
-        <div class="upload-zone" onclick="document.getElementById('f-past-eval').click()"
-          ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
-          ondrop="pastEvalDrop(event)">
-          <div class="upload-icon">📊</div>
-          <div class="upload-text"><strong>과거 평가 엑셀 클릭 또는 드래그</strong><br>.xlsx / .xls</div>
-        </div>
-        <input type="file" id="f-past-eval" accept=".xlsx,.xls" style="display:none" onchange="pastEvalUpload(event)">
-        <div class="upload-result" id="r-past-eval"></div>
-      </div>
-    </div>
-
-  </div>`;
+  return buildHrListPage();
 }
 
 // ── 인적사항 양식 헤더 정의 ──
@@ -2738,6 +2767,8 @@ function hrPersonsParse(file) {
         if (r.every(c=>c==='')) continue;
         const obj={};
         headers.forEach((h,j)=>{ obj[h]=String(r[j]||'').trim(); });
+        const name = (obj['이름']||obj['성명']||'').trim();
+        if (!name || name==='-') continue; // 이름 없는 행 제외
         data.push(obj);
       }
       hrPersons = data;
@@ -3187,6 +3218,10 @@ function renderHrList() {
   const wrap = document.getElementById('hr-list-wrap');
   const tabEl = document.getElementById('hr-tab-filter');
   if (!wrap) return;
+
+  // 등록 인원 수 표시
+  const cntEl = document.getElementById('hr-list-persons-cnt');
+  if (cntEl) cntEl.textContent = hrPersons.length ? hrPersons.length+'명 등록됨' : '';
 
   function getBonbu(p) { return (p['본부']||p['본부명']||'').trim(); }
 
@@ -3784,7 +3819,7 @@ function showHrDetail(encSabun, encName) {
           <div id="mbo-modal-empty" style="display:none;text-align:center;padding:60px;color:var(--text-muted)">
             <div style="font-size:48px;margin-bottom:16px">📭</div>
             <div style="font-size:14px">PDF가 아직 업로드되지 않았습니다.</div>
-            ${isAdmin?`<div style="font-size:12px;margin-top:8px">인사 데이터 업로드 페이지에서 업로드해 주세요.</div>`:''}
+            ${isAdmin?`<div style="font-size:12px;margin-top:8px">인원 통합 관리 페이지의 엑셀 업로드에서 등록해 주세요.</div>`:''}
           </div>
         </div>
       </div>
@@ -5063,15 +5098,17 @@ function renderMembersAdmin() {
     });
   }
 
-  const roleLabel = {admin:'관리자', eval:'평가자(부서장)', person:'직책자'}; 
-  const roleCls   = {admin:'role-admin', eval:'role-eval', person:'role-person'};
+  const roleLabel = {admin:'관리자', ceo:'관리자(대표)', eval:'평가자(부서장)', person:'직책자'}; 
+  const roleCls   = {admin:'role-admin', ceo:'role-admin', eval:'role-eval', person:'role-person'};
 
   tb.innerHTML = '';
   list.forEach(a => {
-    // persons에서 조직 정보
+    // persons에서 조직/직급 정보
     const p = persons.find(x => x.sabun === a.id || x.name === a.name);
-    const dept = p ? `${p.bonbu||''} ${p.jijum||''}`.trim() : (a.dept||'-');
-    const pos  = p ? (p.jikchek||'-') : (a.position||'-');
+    const bonbu  = p ? (p.bonbu||'-')   : (a.dept||'-');
+    const jijum  = p ? (p.jijum||'-')   : (a.jijum||'-');
+    const pos    = p ? (p.jikchek||'-') : (a.position||'-');
+    const jikgup = p ? (p.jikgup||'-')  : '-';
 
     // hrPersons 포함 여부
     const inHr = hrPersons.some(h =>
@@ -5079,38 +5116,101 @@ function renderMembersAdmin() {
       ((h['이름']||h['성명']||'').trim() === a.name)
     );
 
-    // 담당 직책자 수 (평가자만)
-    const cnt = a.role === 'eval' ? persons.filter(x => x.evaluatorId === a.id).length : null;
+    // 평가 대상 직책자 수
+    const cnt = a.role === 'eval' ? persons.filter(x => {
+      const aDept  = (a.dept     || '').trim();
+      const aJijum = (a.position || '').trim();
+      return (x.bonbu||'').trim() === aDept && (x.jijum||'').trim() === aJijum && x.active !== false;
+    }).length : null;
 
-    const rowStyle = !inHr && a.role !== 'admin' ? 'opacity:0.55' : '';
+    // PDF 슬롯 (hrPersons에 있는 경우만)
+    const hrRow = hrPersons.find(h =>
+      (a.id && (h['사번']||'').toString().trim() === a.id) ||
+      ((h['이름']||h['성명']||'').trim() === a.name)
+    );
+    const pdfKey = hrRow ? hrKey(hrRow) : (a.id || a.name);
+    const encKey = encodeURIComponent(pdfKey);
+    const pdfs   = hrPdfs[pdfKey] || {};
+    // PDF 년도별 그룹핑
+    const pdfYears = [...new Set(PDF_TYPES.map(t => t.key.replace(/[^0-9]/g,'')))];
+    const extra = (hrExtra && hrExtra[pdfKey]) || {};
+    const hasPhoto = !!(extra.photo);
+    const photoCell = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;align-self:stretch">
+        <div style="font-size:9px;font-weight:700;color:var(--primary);padding:1px 5px;background:#e3eef8;border-radius:3px;white-space:nowrap">사진</div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center">
+          ${hasPhoto
+            ? `<img src="${extra.photo}" style="width:36px;height:48px;object-fit:cover;border-radius:2px;border:1px solid var(--border);display:block">`
+            : '<span style="font-size:18px">🖼️</span>'}
+        </div>
+        <label style="cursor:pointer">
+          <input type="file" accept="image/*" style="display:none"
+            onchange="hrPhotoUploadInline(event,'${encKey}',this.closest('label'))">
+          <span style="font-size:9px;color:var(--primary);white-space:nowrap">${hasPhoto?'변경':'업로드'}</span>
+        </label>
+        ${hasPhoto?`<button type="button" onclick="hrPhotoDeleteInline('${encKey}');event.stopPropagation()"
+          style="font-size:9px;background:none;border:none;color:var(--danger);cursor:pointer;padding:0">삭제</button>`:''}
+      </div>`;
+
+    const pdfHtml = PDF_TYPES.map(t => {
+      const has = !!(pdfs[t.key]);
+      const yearLabel = t.key.replace(/[^0-9]/g,'');
+      return `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;align-self:stretch">
+        <div style="font-size:9px;font-weight:700;color:var(--primary);padding:1px 5px;background:#e3eef8;border-radius:3px">${yearLabel}</div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">
+          <label style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px">
+            <input type="file" accept=".pdf" style="display:none"
+              onchange="hrPdfUploadInline(event,'${encKey}','${t.key}',this.closest('label'))">
+            <span style="font-size:15px">${has?'✅':'📄'}</span>
+            <span style="font-size:9px;color:${has?'var(--success)':'var(--text-muted)'};white-space:nowrap">${has?'등록됨':'업로드'}</span>
+          </label>
+          ${has?`<button type="button" onclick="hrPdfDeleteInline('${encKey}','${t.key}',this.closest('td'));event.stopPropagation()"
+            style="font-size:9px;background:none;border:none;color:var(--danger);cursor:pointer;padding:0">삭제</button>`:''}
+        </div>
+      </div>`;
+    }).join('<div style="width:1px;background:var(--border);align-self:stretch"></div>');
+
+    const rowStyle = !inHr && a.role !== 'admin' && a.role !== 'ceo' ? 'opacity:0.55' : '';
 
     tb.innerHTML += `<tr style="${rowStyle}">
       <td style="font-size:11px;color:var(--text-muted)">${a.id}</td>
       <td><strong>${a.name}</strong></td>
-      <td style="font-size:11px">${dept}</td>
+      <td style="font-size:11px">${bonbu}</td>
+      <td style="font-size:11px">${jijum}</td>
       <td style="font-size:11px">${pos}</td>
+      <td style="font-size:11px">${jikgup}</td>
       <td><span class="${roleCls[a.role]||''}">${roleLabel[a.role]||a.role}</span></td>
       <td>
         <div style="display:flex;flex-direction:column;gap:4px">
           <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
-            <input type="checkbox" ${inHr?'checked':''} ${a.role==='admin'?'disabled':''}
+            <input type="checkbox" ${inHr?'checked':''} ${(a.role==='admin'||a.role==='ceo')?'disabled':''}
               onchange="toggleHrIncluded('${a.id}','${a.name}',this.checked)">
             인적사항 포함
           </label>
           <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
-            <input type="checkbox" ${a.hrView?'checked':''} ${a.role==='admin'?'disabled':''}
+            <input type="checkbox" ${a.hrView?'checked':''} ${(a.role==='admin'||a.role==='ceo')?'disabled':''}
               onchange="toggleHrView('${a.id}',this.checked)">
             인사조회 허용
           </label>
         </div>
       </td>
       <td style="font-size:12px">${cnt !== null ? cnt+'명' : '-'}</td>
+      <td style="padding:0">
+        ${inHr
+          ? `<div style="display:flex;align-items:stretch;height:100%">
+              ${photoCell}
+              <div style="width:1px;background:var(--border)"></div>
+              ${pdfHtml}
+             </div>`
+          : '<span style="font-size:10px;color:var(--text-muted);padding:8px;display:block">인적사항 등록 후 가능</span>'}
+      </td>
       <td>
         <div style="display:flex;gap:4px">
           <button class="btn btn-outline btn-sm" onclick="openAModal('${a.id}')">수정</button>
-          ${a.id!=='admin'
-            ? `<button class="btn btn-danger btn-sm" onclick="deleteAccount('${a.id}')">삭제</button>`
-            : '<span style="font-size:10px;color:var(--text-muted)">기본계정</span>'}
+          ${a.id==='admin'
+            ? '<span style="font-size:10px;color:var(--text-muted)">기본계정</span>'
+            : `<button class="btn btn-danger btn-sm" onclick="deleteAccount('${a.id}')">삭제</button>`}
         </div>
       </td>
     </tr>`;
@@ -5126,11 +5226,235 @@ function renderMembersAdmin() {
   if (existingTr) existingTr.remove();
   const summaryTr = document.createElement('tr');
   summaryTr.id = 'members-summary-row';
-  summaryTr.innerHTML = `<td colspan="8" style="background:#f0f3f8;padding:8px 14px;font-size:11px;color:var(--text-muted);text-align:left">
+  summaryTr.innerHTML = `<td colspan="11" style="background:#f0f3f8;padding:8px 14px;font-size:11px;color:var(--text-muted);text-align:left">
     총 ${total}명 표시 중 · 인적사항 포함 ${inHrCnt}명 · 미포함 ${total-inHrCnt}명
     <span style="margin-left:12px;color:#b7791f">※ 흐린 행 = 인적사항 미포함</span>
   </td>`;
   tb.appendChild(summaryTr);
+}
+
+// ══════════════════════
+//  인원통합관리 전용 핸들러
+// ══════════════════════
+
+// 인적사항 목록 페이지 업로드 핸들러
+function hrPersonsUploadFromList(e) {
+  const f = e.target.files[0]; if(!f) return; e.target.value='';
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (rows.length < 2) { hrSetResult('hr-upload-result-list','warn','데이터가 없습니다.'); return; }
+      const headers = rows[0].map(h=>String(h).trim());
+      const data = [];
+      for (let i=1;i<rows.length;i++) {
+        const r=rows[i];
+        if (r.every(c=>c==='')) continue;
+        const obj={}; headers.forEach((h,j)=>{ obj[h]=String(r[j]||'').trim(); }); data.push(obj);
+      }
+      hrPersons = data;
+      localStorage.setItem('hr_persons', JSON.stringify(hrPersons));
+      save();
+      const cntM = document.getElementById('members-hr-persons-cnt');
+      if(cntM) cntM.textContent = data.length+'명 등록됨';
+      const cntL = document.getElementById('hr-list-persons-cnt');
+      if(cntL) cntL.textContent = data.length+'명 등록됨';
+      const evalFound = EVAL_COL_KEYS.filter(k => headers.includes(k)).length;
+      hrSetResult('hr-upload-result-list','ok',
+        `✅ ${data.length}명 업로드 완료 (컬럼 ${headers.length}개${evalFound?` · 평가항목 ${evalFound}개 인식`:''})`);
+      hrFilterBonbu = null;
+      renderHrList();
+    } catch(err) { hrSetResult('hr-upload-result-list','warn','오류: '+err.message); }
+  };
+  reader.readAsBinaryString(f);
+}
+
+// 인적사항 업로드 (인원통합관리용)
+function hrPersonsDropM(e) {
+  e.preventDefault(); e.currentTarget.classList.remove('drag');
+  const f = e.dataTransfer.files[0]; if(f) hrPersonsParseM(f);
+}
+function hrPersonsUploadM(e) {
+  const f = e.target.files[0]; if(f) hrPersonsParseM(f); e.target.value='';
+}
+function hrPersonsParseM(file) {
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (rows.length < 2) { hrSetResult('r-hr-persons-m','warn','데이터가 없습니다.'); return; }
+      const headers = rows[0].map(h=>String(h).trim());
+      const data = [];
+      for (let i=1;i<rows.length;i++) {
+        const r=rows[i];
+        if (r.every(c=>c==='')) continue;
+        const obj={}; headers.forEach((h,j)=>{ obj[h]=String(r[j]||'').trim(); }); data.push(obj);
+      }
+      hrPersons = data;
+      localStorage.setItem('hr_persons', JSON.stringify(hrPersons));
+      save();
+      const cnt = document.getElementById('members-hr-persons-cnt');
+      if(cnt) cnt.textContent = data.length+'명 등록됨';
+      const evalFound = EVAL_COL_KEYS.filter(k => headers.includes(k)).length;
+      hrSetResult('r-hr-persons-m','ok',
+        `✅ ${data.length}명 업로드 완료 (컬럼 ${headers.length}개${evalFound?` · 평가항목 ${evalFound}개 인식`:''})`);
+      renderMembersAdmin();
+    } catch(err) { hrSetResult('r-hr-persons-m','warn','오류: '+err.message); }
+  };
+  reader.readAsBinaryString(file);
+}
+
+// 과거 평가 업로드 (인원통합관리용)
+function updatePastEvalBadgeM() {
+  const y = document.getElementById('past-eval-year-m')?.value;
+  const q = document.getElementById('past-eval-quarter-m')?.value;
+  const badge = document.getElementById('past-eval-target-badge-m');
+  if (badge && y && q) badge.textContent = `→ eval_${y}_Q${q}`;
+}
+function pastEvalDropM(e) {
+  e.preventDefault(); e.currentTarget.classList.remove('drag');
+  const file = e.dataTransfer.files[0]; if (file) pastEvalProcessM(file);
+}
+function pastEvalUploadM(e) {
+  const file = e.target.files[0]; if (file) pastEvalProcessM(file); e.target.value='';
+}
+async function pastEvalProcessM(file) {
+  const year    = document.getElementById('past-eval-year-m')?.value;
+  const quarter = document.getElementById('past-eval-quarter-m')?.value;
+  if (!year || !quarter) { showToast('년도와 분기를 먼저 선택해주세요.'); return; }
+  const docKey = `eval_${year}_Q${quarter}`;
+  hrSetResult('r-past-eval-m', 'info', '⏳ 처리 중...');
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (rows.length < 2) { hrSetResult('r-past-eval-m','warn','데이터가 없습니다.'); return; }
+      const headers = rows[0].map(h=>String(h).trim());
+      const sabunIdx   = headers.findIndex(h=>h==='사번');
+      const nameIdx    = headers.findIndex(h=>h==='이름');
+      const commentIdx = headers.findIndex(h=>h.startsWith('서술'));
+      const fixedCols  = new Set([sabunIdx, nameIdx, commentIdx].filter(i=>i>=0));
+      const gCols      = headers.map((_,i)=>i).filter(i=>!fixedCols.has(i)).slice(0,5);
+      function parseScore(v) {
+        const s = String(v||'').trim().toUpperCase();
+        if (s==='') return '';
+        const n = Number(s); if (!isNaN(n) && n>0) return n;
+        return ({S:100,A:90,B:80,C:70,D:60,E:50}[s] ?? '');
+      }
+      let existing = {};
+      try { const doc = await db.collection('evalData').doc(docKey).get(); existing = doc.exists?(doc.data().data||{}):{};
+      } catch(e) { existing = JSON.parse(localStorage.getItem(docKey)||'{}'); }
+      let ok=0, skip=0;
+      for (let i=1;i<rows.length;i++) {
+        const r=rows[i]; if(r.every(c=>c==='')) continue;
+        const sabun=sabunIdx>=0?String(r[sabunIdx]||'').trim():'';
+        const name =nameIdx>=0 ?String(r[nameIdx] ||'').trim():'';
+        const person=persons.find(p=>(sabun&&p.sabun===sabun)||(name&&p.name===name));
+        if(!person){skip++;continue;}
+        existing[person.no]={...(existing[person.no]||{}),
+          g1:parseScore(r[gCols[0]]),g2:parseScore(r[gCols[1]]),g3:parseScore(r[gCols[2]]),
+          g4:parseScore(r[gCols[3]]),g5:parseScore(r[gCols[4]]),
+          comment:commentIdx>=0?String(r[commentIdx]||'').trim():'',
+          updatedAt:new Date().toISOString()};
+        ok++;
+      }
+      try { await db.collection('evalData').doc(docKey).set({data:existing},{merge:true}); } catch(e){}
+      localStorage.setItem(docKey, JSON.stringify(existing));
+      hrSetResult('r-past-eval-m','ok',`✅ ${docKey} 업로드 완료 · ${ok}명 반영 · ${skip}명 미매칭`);
+    } catch(err) { hrSetResult('r-past-eval-m','warn','오류: '+err.message); }
+  };
+  reader.readAsBinaryString(file);
+}
+
+// 사진 인라인 업로드 (인원통합관리 목록 내)
+function hrPhotoUploadInline(e, encKey, labelEl) {
+  const key  = decodeURIComponent(encKey);
+  const file = e.target.files[0]; if(!file) return;
+  if(labelEl) labelEl.innerHTML = '<span style="font-size:10px;color:var(--text-muted)">⏳...</span>';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = async () => {
+      const MAX_W=300, MAX_H=400;
+      let w=img.width, h=img.height;
+      if (w/h > MAX_W/MAX_H) { w=MAX_W; h=Math.round(img.height*MAX_W/img.width); }
+      else { h=MAX_H; w=Math.round(img.width*MAX_H/img.height); }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const blob = await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.85));
+      const path = `photos/${key}/photo.jpg`;
+      const ref  = storage.ref(path);
+      try {
+        await ref.put(blob, {contentType:'image/jpeg'});
+        const url = await ref.getDownloadURL();
+        if (!hrExtra[key]) hrExtra[key]={};
+        hrExtra[key].photo = url;
+        await db.collection('hrExtra').doc(key).set({photo:url},{merge:true});
+        localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+        showToast('✅ 사진 업로드 완료');
+        renderMembersAdmin();
+      } catch(err) { showToast('사진 업로드 실패: '+err.message); }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// 사진 인라인 삭제 (인원통합관리 목록 내)
+async function hrPhotoDeleteInline(encKey) {
+  if(!confirm('사진을 삭제할까요?')) return;
+  const key = decodeURIComponent(encKey);
+  try { await storage.ref(`photos/${key}/photo.jpg`).delete(); } catch(e){}
+  if(hrExtra[key]) delete hrExtra[key].photo;
+  try { await db.collection('hrExtra').doc(key).set(hrExtra[key]||{},{merge:false}); } catch(e){}
+  localStorage.setItem('hr_extra', JSON.stringify(hrExtra));
+  showToast('🗑️ 사진 삭제 완료');
+  renderMembersAdmin();
+}
+
+// PDF 인라인 업로드 (인원통합관리 목록 내)
+function hrPdfUploadInline(e, encKey, pdfType, labelEl) {
+  const key  = decodeURIComponent(encKey);
+  const file = e.target.files[0]; if(!file) return;
+  labelEl.innerHTML = '<span style="font-size:10px;color:var(--text-muted)">⏳ 업로드 중...</span>';
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const base64 = ev.target.result;
+      const path   = `hrPdfs/${key}/${pdfType}.pdf`;
+      const ref    = storage.ref(path);
+      await ref.putString(base64.split(',')[1], 'base64', {contentType:'application/pdf'});
+      const url = await ref.getDownloadURL();
+      if (!hrPdfs[key]) hrPdfs[key] = {};
+      hrPdfs[key][pdfType] = url;
+      await db.collection('hrPdfs').doc(key).set(hrPdfs[key], {merge:true});
+      localStorage.setItem('hr_pdfs', JSON.stringify(hrPdfs));
+      showToast('✅ PDF 업로드 완료');
+      renderMembersAdmin();
+    } catch(err) { labelEl.innerHTML = '<span style="font-size:10px;color:var(--danger)">오류</span>'; showToast('업로드 실패: '+err.message); }
+  };
+  reader.readAsDataURL(file);
+}
+
+// PDF 인라인 삭제 (인원통합관리 목록 내)
+async function hrPdfDeleteInline(encKey, pdfType, tdEl) {
+  if (!confirm('PDF를 삭제할까요?')) return;
+  const key = decodeURIComponent(encKey);
+  try {
+    await storage.ref(`hrPdfs/${key}/${pdfType}.pdf`).delete();
+  } catch(e){}
+  if (hrPdfs[key]) delete hrPdfs[key][pdfType];
+  try { await db.collection('hrPdfs').doc(key).set(hrPdfs[key]||{}, {merge:false}); } catch(e){}
+  localStorage.setItem('hr_pdfs', JSON.stringify(hrPdfs));
+  showToast('🗑️ PDF 삭제 완료');
+  renderMembersAdmin();
 }
 
 // ══ TOAST ══
